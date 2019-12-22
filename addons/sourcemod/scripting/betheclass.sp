@@ -330,7 +330,7 @@ public void OnClientPutInServer(int client)
 	ToCWizard(baseplayer).Init();
 	ToCMercenary(baseplayer).Init();
 
-	SDKHook(client, SDKHook_PreThink, OnBaseThink);
+	//SDKHook(client, SDKHook_PreThink, OnBaseThink);
 	// Pickup block for wizard
 	SDKHook(client, SDKHook_StartTouch, OnPickup);
 	SDKHook(client, SDKHook_Touch, OnPickup);
@@ -538,20 +538,23 @@ public Action OnItemPickUp(Event event, const char[] eventName, bool dontBroadca
 	return Plugin_Continue;
 }
 
-public Action OnBaseThink(int iClient)
+public void OnGameFrame()
 {
-	if(!IsValidClient(iClient)) {
-		SDKUnhook(iClient, SDKHook_PreThink, OnBaseThink);
-		return Plugin_Continue;
-	}
 	if(!bEnabled.BoolValue || FF2_GetRoundState() <= 0) {
 		return Plugin_Continue;
 	}
-	BaseClass baseplayer = BaseClass(iClient);
-	switch(baseplayer.iClassType) {
-		case None:		{}
-		case Wizard:	ToCWizard(baseplayer).Think();
-		case Mercenary:	ToCMercenary(baseplayer).Think();
+
+	BaseClass baseplayer;
+	for( int i=MaxClients ; i > 0 ; i-- ) { // Begin iterating over all players every 0.1s, less memory intense than calling up to 24-32 timers
+		if( !IsValidClient(i) )
+			continue;
+
+		baseplayer = BaseClass(i);
+		switch(baseplayer.iClassType) {
+			case None:		{}
+			case Wizard:	ToCWizard(baseplayer).Think();
+			case Mercenary:	ToCMercenary(baseplayer).Think();
+		}
 	}
 	return Plugin_Continue;
 }
