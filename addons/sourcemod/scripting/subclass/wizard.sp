@@ -395,6 +395,8 @@ methodmap CWizard < BaseClass
 
 	public void Think()
 	{
+		this.UpdateHUD();
+		
 		char sModel[128];
 		GetEntPropString(this.index, Prop_Data, "m_ModelName", sModel, sizeof(sModel)); // Get the complete Modelname.
 		if(StrEqual(sModel, Sniper_Model, false)) { // Bug fix, removing quads turns the player to default sniper model

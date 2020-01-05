@@ -112,6 +112,8 @@ methodmap CMercenary < BaseClass
 			SetEntPropFloat(this.index, Prop_Send, "m_flMaxspeed", 300.0); // Default value according to https://forums.alliedmods.net/showthread.php?t=266584
 		*/
 
+		this.UpdateHUD();
+
 		char sModel[128];
 		GetEntPropString(this.index, Prop_Data, "m_ModelName", sModel, sizeof(sModel)); // Get the complete Modelname.
 		if(StrEqual(sModel, Soldier_Model, false)) { // Bug fix, removing quads turns the player to default soldier model

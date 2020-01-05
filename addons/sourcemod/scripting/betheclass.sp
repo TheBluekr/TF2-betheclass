@@ -16,7 +16,7 @@ Attempt at creating a custom class hub -Blue
 
 #define int(%1)	view_as<int>(%1)
 
-#define PLUGIN_VERSION "1.0.3"
+#define PLUGIN_VERSION "1.0.4"
 
 // Python style declarations
 #define or ||
@@ -330,10 +330,9 @@ public void OnClientPutInServer(int client)
 	ToCWizard(baseplayer).Init();
 	ToCMercenary(baseplayer).Init();
 
-	//SDKHook(client, SDKHook_PreThink, OnBaseThink);
 	// Pickup block for wizard
-	SDKHook(client, SDKHook_StartTouch, OnPickup);
-	SDKHook(client, SDKHook_Touch, OnPickup);
+	/*SDKHook(client, SDKHook_StartTouch, OnPickup);
+	SDKHook(client, SDKHook_Touch, OnPickup);*/
 }
 
 public void OnClientDisconnect(int client)
@@ -413,9 +412,18 @@ public Action OnPlayerSpawn(Event event, const char[] name, bool dontBroadcast)
 	SetVariantString("");
 	AcceptEntityInput(baseplayer.index, "SetCustomModel");
 
+	SDKUnhook(baseplayer.index, SDKHook_PreThinkPost, OnBaseThink); // Prevent double hooks
+
+	if(!SDKHookEx(baseplayer.index, SDKHook_PreThinkPost, OnBaseThink)) {
+		PrintToChat(baseplayer.index, "\x01\x070066BB[BeTheClass]\x01 Failed to setup custom class.")
+		baseplayer.iClassType = None;
+		return Plugin_Continue;
+	}
+	
 	switch(baseplayer.iPresetType) {
 		case None: {
 			baseplayer.iClassType = None;
+			SDKUnhook(baseplayer.index, SDKHook_PreThinkPost, OnBaseThink);
 		}
 		case Wizard: {
 			if( CalcLimit(Wizard) < cvarBTC[WizardLimit].IntValue ) {
@@ -432,6 +440,7 @@ public Action OnPlayerSpawn(Event event, const char[] name, bool dontBroadcast)
 		default: { // In case we're going out of index
 			baseplayer.iPresetType = None;
 			baseplayer.iClassType = None;
+			SDKUnhook(baseplayer.index, SDKHook_PreThinkPost, OnBaseThink);
 		}
 	}
 	return Plugin_Continue;
@@ -538,7 +547,7 @@ public Action OnItemPickUp(Event event, const char[] eventName, bool dontBroadca
 	return Plugin_Continue;
 }
 
-public void OnGameFrame()
+/*public void OnGameFrame()
 {
 	if(!bEnabled.BoolValue || FF2_GetRoundState() <= 0) {
 		return Plugin_Continue;
@@ -557,9 +566,9 @@ public void OnGameFrame()
 		}
 	}
 	return Plugin_Continue;
-}
+}*/
 
-public Action Timer_BaseThink(Handle hTimer)
+public Action BaseThink()
 {
 	if(!bEnabled.BoolValue || FF2_GetRoundState() <= 0) {
 		return Plugin_Continue;
@@ -572,8 +581,8 @@ public Action Timer_BaseThink(Handle hTimer)
 		baseplayer = BaseClass(i);
 		switch(baseplayer.iClassType) {
 			case None:		{}
-			case Wizard:	ToCWizard(baseplayer).UpdateHUD();
-			case Mercenary:	ToCMercenary(baseplayer).UpdateHUD();
+			case Wizard:	ToCWizard(baseplayer).Think();
+			case Mercenary:	ToCMercenary(baseplayer).Think();
 		}
 	}
 	return Plugin_Continue;
