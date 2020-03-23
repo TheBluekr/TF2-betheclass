@@ -9,14 +9,16 @@ Attempt at creating a custom class hub -Blue
 #include <tf2_stocks>
 #include <tf2attributes>
 #include <tf2items>
-#include <string>
 #include <betheclass>
-#include <ClassRestrictionsForHumans>
-#include <freak_fortress_2>
+#undef REQUIRE_PLUGIN
+#tryinclude <ClassRestrictionsForHumans>
+#tryinclude <freak_fortress_2>
+#tryinclude <vsh2>
+#define REQUIRE_PLUGIN
 
 #define int(%1)	view_as<int>(%1)
 
-#define PLUGIN_VERSION "1.0.4"
+#define PLUGIN_VERSION "1.0.5"
 
 // Python style declarations
 #define or ||
@@ -81,6 +83,9 @@ enum /* Forwards */ {
 	OnWizardCast,
 	OnMercenaryGrenadeThrow
 }
+
+bool g_vsh2 = false;
+ConVar vsh2_enabled;
 
 ConVar bEnabled = null;
 ConVar cvarBTC[VersionNumber+1]; // Don't touch, add cvars in enum above
@@ -205,6 +210,19 @@ methodmap BaseClass
 #include "subclass/wizard.sp"
 #include "subclass/mercenary.sp"
 #include "subclass/natives.sp"
+
+public void OnLibraryAdded(const char[] name) {
+	if( StrEqual(name, "VSH2") ) {
+		g_vsh2 = true;
+		vsh2_enabled = FindConVar("vsh2_enabled");
+	}
+}
+
+public void OnLibraryRemoved(const char[] name) {
+	if( StrEqual(name, "VSH2") ) {
+		g_vsh2 = false;
+	}
+}
 
 public void OnPluginStart()
 {
@@ -349,7 +367,11 @@ public void OnClientDisconnect(int client)
 public void OnMapStart()
 {
 	PrecacheSound(SOUND_RECHARGE, true);
-	CreateTimer(0.1, Timer_BaseThink, _, TIMER_REPEAT|TIMER_FLAG_NO_MAPCHANGE);
+#if defined _vsh2_included
+	if(g_vsh2 && vsh2_enabled.BoolValue)
+		VSH2_Hook(OnRedPlayerThink, VSH2_BaseThink);
+	else
+		CreateTimer(0.1, Timer_BaseThink, _, TIMER_REPEAT|TIMER_FLAG_NO_MAPCHANGE);
 }
 
 public void OnRoundStart(Event event, const char[] name, bool dontBroadcast)
@@ -389,14 +411,25 @@ public Action OnPlayerSpawn(Event event, const char[] name, bool dontBroadcast)
 
 	baseplayer.iClassType = None;
 	
+#if defined _FF2_included
 	if(FF2_GetBossIndex(baseplayer.index) != -1) // Check if our user isn't a boss
 		return Plugin_Continue;
 	
 	// Future warning, might remove this due to the forward handling this
 	if(FF2_GetRoundState() == 1) // Flipping logic around, don't set custom classes during round due to minions and class scrambling. Call BTCBase.Convert() instead mid-round.
 		return Plugin_Continue;
+#endif
+
+#if defined _vsh2_included
+	if(VSH2Player(baseplayer.index).GetPropInt("iBossType") > -1)
+		return Plugin_Continue;
 	
-	/*iPreset = baseplayer.iPresetType;
+	// See FF2 note above
+	if(VSH2GameMode_GetProperty("iRoundState") == StateRunning)
+		return Plugin_Continue;
+#endif
+	
+	iPreset = baseplayer.iPresetType;
 
 	Action action = Plugin_Continue;
 	Call_StartForward(forwardBTC[OnSpawn]);
@@ -406,7 +439,7 @@ public Action OnPlayerSpawn(Event event, const char[] name, bool dontBroadcast)
 
 	if(action > Plugin_Continue) {
 		return Plugin_Continue;
-	}*/
+	}
 
 	TF2Attrib_RemoveAll(baseplayer.index);
 	SetVariantString("");
@@ -554,7 +587,7 @@ public Action OnItemPickUp(Event event, const char[] eventName, bool dontBroadca
 	}
 
 	BaseClass baseplayer;
-	for( int i=MaxClients ; i > 0 ; i-- ) { // Begin iterating over all players every 0.1s, less memory intense than calling up to 24-32 timers
+	for( int i=MaxClients ; i > 0 ; i-- ) {
 		if( !IsValidClient(i) )
 			continue;
 
@@ -570,9 +603,19 @@ public Action OnItemPickUp(Event event, const char[] eventName, bool dontBroadca
 
 public Action BaseThink()
 {
-	if(!bEnabled.BoolValue || FF2_GetRoundState() <= 0) {
+#if defined _FF2_included
+	if(FF2_GetRoundState() <= 0)
 		return Plugin_Continue;
-	}
+#endif
+
+#if defined _vsh2_included
+	if(!VSH2GameMode_GetPropInt("iRoundState") <= 0)
+		return Plugin_Continue;
+#endif
+
+	if(!bEnabled.BoolValue)
+		return Plugin_Continue;
+
 	BaseClass baseplayer;
 	for( int i=MaxClients ; i > 0 ; i-- ) { // Begin iterating over all players every 0.1s, less memory intense than calling up to 24-32 timers
 		if( !IsValidClient(i) )
@@ -588,6 +631,24 @@ public Action BaseThink()
 	return Plugin_Continue;
 }
 
+#if defined _vsh2_included
+public Action VSH2_BaseThink(const VSH2Player player)
+{
+	if(!g_vsh2 || vsh2_enabled.BoolValue)
+		return Plugin_Continue;
+	
+	if(!bEnabled.BoolValue)
+		return Plugin_Continue;
+	
+	baseplayer = BaseClass(player.index)
+	switch(baseplayer.iClassType) {
+		case None:		{}
+		case Wizard:	ToCWizard(baseplayer).Think();
+		case Mercenary:	ToCMercenary(baseplayer).Think();
+	}
+}
+#endif
+
 public int CalcLimit(BTCClass iClass)
 {
 	int total;
@@ -598,6 +659,7 @@ public int CalcLimit(BTCClass iClass)
 	return total;
 }
 
+#if defined _classrestrictionsforhumans_included
 public Action CRH_CountTowardsLimit(int iClient)
 {
 	if(!bEnabled.BoolValue)
@@ -609,6 +671,7 @@ public Action CRH_CountTowardsLimit(int iClient)
 
 	return Plugin_Continue;
 }
+#endif
 
 // TF2 event handling
 public void TF2_OnConditionAdded(int iClient, TFCond condition)
