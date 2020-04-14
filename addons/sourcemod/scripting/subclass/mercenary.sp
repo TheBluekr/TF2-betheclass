@@ -78,8 +78,7 @@ methodmap CMercenary < BaseClass
 	}
 	public void OnDeath(BaseClass attacker, BaseClass victim, Event event)
 	{
-		SetHudTextParams(0.75, 0.85, 0.5, 255, 255, 255, 255, 2, 0.0, 0.0, 0.0);
-		ShowSyncHudText(this.index, GrenadeHUD, "");
+		this.UpdateHUD(this.index, GrenadeHUD, "", 0.75, 0.85, 0.5, 255, 255, 255, 255, 2, 0.0, 0.0, 0.0);
 	}
 	public void OnKill(BaseClass attacker, BaseClass victim, Event event)
 	{
@@ -112,7 +111,11 @@ methodmap CMercenary < BaseClass
 			SetEntPropFloat(this.index, Prop_Send, "m_flMaxspeed", 300.0); // Default value according to https://forums.alliedmods.net/showthread.php?t=266584
 		*/
 
-		this.UpdateHUD();
+		if(IsClientAlive(this.index)) {
+			char GrenadeHUDText[255]; // Display of current amount grenades
+			Format(GrenadeHUDText, sizeof(GrenadeHUDText), "Grenades: %i", this.iGrenadeStock);
+			this.UpdateHUD(this.index, GrenadeHUD, GrenadeHUDText, 0.75, 0.85, 0.5, 255, 255, 255, 255, 2, 0.0, 0.0, 0.0);
+		}
 
 		char sModel[128];
 		GetEntPropString(this.index, Prop_Data, "m_ModelName", sModel, sizeof(sModel)); // Get the complete Modelname.
@@ -142,15 +145,6 @@ methodmap CMercenary < BaseClass
 			FakeClientCommand(this.index, "use tf_weapon_grapplinghook");
 		}
 	}
-	public void UpdateHUD()
-	{
-		char GrenadeHUDText[255]; // Display of current amount grenades
-		Format(GrenadeHUDText, sizeof(GrenadeHUDText), "Grenades: %i", this.iGrenadeStock);
-		if(IsClientAlive(this.index)) {
-			SetHudTextParams(0.75, 0.85, 0.5, 255, 255, 255, 255, 2, 0.0, 0.0, 0.0);
-			ShowSyncHudText(this.index, GrenadeHUD, GrenadeHUDText);
-		}
-	}
 	public void OnConditionAdded(TFCond condition)
 	{
 	}
@@ -168,8 +162,7 @@ public void SetupMercenary(CMercenary merc)
 	if(!StrEqual(sModel, Merc_Model, false) && (merc.iTeam == FF2_GetBossTeam() || FF2_GetBossIndex(merc.index) != -1))
 	{
 		merc.iClassType = None;
-		SetHudTextParams(0.75, 0.85, 0.5, 255, 255, 255, 255, 2, 0.0, 0.0, 0.0);
-		ShowSyncHudText(merc.index, GrenadeHUD, "");
+		merc.UpdateHUD(merc.index, GrenadeHUD, "", 0.75, 0.85, 0.5, 255, 255, 255, 255, 2, 0.0, 0.0, 0.0);
 		return;
 	}
 	if(IsClientHere(merc.index)) { // Assuming we're using normal or quad model)

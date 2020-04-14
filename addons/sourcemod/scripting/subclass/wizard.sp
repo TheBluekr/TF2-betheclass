@@ -370,9 +370,8 @@ methodmap CWizard < BaseClass
 				Format(killSound, sizeof(killSound), "vo/halloween_merasmus/sf12_combat_idle0%i.mp3", GetRandomInt(1, 2));
 				EmitSoundToAll(killSound, attacker.index, _, _, _, 0.5, _, _, victimpos, _, false);
 				// Begin cleaning the HUD handles
-				SetHudTextParams(0.0, -1.0, 0.5, 0, 255, 0, 255, 2, 0.0, 0.0, 0.0);
-				ShowSyncHudText(victim.index, SpellHUD, "");
-				ShowSyncHudText(victim.index, CoolHUD, "");
+				this.UpdateHUD(victim.index, SpellHUD, "", 0.0, -1.0, 0.5, 0, 255, 0, 255, 2, 0.0, 0.0, 0.0);
+				this.UpdateHUD(victim.index, CoolHUD, "", 0.0, -1.0, 0.5, 0, 255, 0, 255, 2, 0.0, 0.0, 0.0);
 			}
 		}
 	}
@@ -381,9 +380,32 @@ methodmap CWizard < BaseClass
 	{
 	}
 
+	public void OnDamage(BaseClass attacker, BaseClass victim, Event event)
+	{
+		if(attacker.index == victim.index)
+			return;
+		if(attacker.index == this.index && GetEntPropEnt(attacker.index, Prop_Send, "m_hActiveWeapon") == GetPlayerWeaponSlot(attacker.index, TFWeaponSlot_Melee) && event.GetInt("custom") == 0 /* Spells should have a custom value */ ) {
+			this.fMana += cvarBTC[WizardManaOnHit].FloatValue; // Award 10 mana on melee hit
+			if(this.fInvisBonus > 0.0) {
+				this.fMana += cvarBTC[WizardInvisBonus].FloatValue;
+			}
+		}
+	}
+
+	public void OnHurt(BaseClass attacker, BaseClass victim, Event event)
+	{
+		if(event.GetInt("health") > 0 && event.GetInt("damageamount") > 0) {
+			float fWizardPos[3];
+			char medSound[35];
+			GetClientAbsOrigin(victim.index, fWizardPos);
+			Format(medSound, sizeof(medSound), "vo/merasmus/sf12_pain0%i.mp3", GetRandomInt(1, 6));
+			EmitSoundToAll(medSound, victim.index, _, _, _, 0.3, _, _, fWizardPos, _, false);
+		}
+	}
+
 	public void OnVoiceMenu(const char[] szCmd1, const char[] szCmd2)
 	{
-		if(szCmd1[0] == '0' && szCmd2[0] == '0' && this.fAntiSpamCooldown <= GetEngineTime()) // Medic call
+		if(szCmd1[0] == '0' && szCmd2[0] == '0' && this.fAntiSpamCooldown <= 0.0) // Medic call
 		{
 			if(this.iSelectedSpell <= 1)
 				this.iSelectedSpell = 7;
@@ -395,194 +417,38 @@ methodmap CWizard < BaseClass
 
 	public void Think()
 	{
-		this.UpdateHUD();
-		
-		char sModel[128];
-		GetEntPropString(this.index, Prop_Data, "m_ModelName", sModel, sizeof(sModel)); // Get the complete Modelname.
-		if(StrEqual(sModel, Sniper_Model, false)) { // Bug fix, removing quads turns the player to default sniper model
-			SetVariantString(Wizard_Model);
-			AcceptEntityInput(this.index, "SetCustomModel");
-			SetEntProp(this.index, Prop_Send, "m_bUseClassAnimations", 1);
-		}
-
-		if(this.fMana < cvarBTC[WizardMana].FloatValue) // This should reflect the scale a bit better
-		{
-			this.fMana += cvarBTC[WizardManaRegen].FloatValue * GetTickInterval();
-		}
-		if(this.fMana > cvarBTC[WizardMana].FloatValue)
-			this.fMana = cvarBTC[WizardMana].FloatValue;
-
-		if(this.fFireCooldown <= GetEngineTime() && this.iFireCharges < cvarBTC[WizardFireCharges].IntValue)
-		{
-			this.iFireCharges++;
-			if(this.iFireCharges < cvarBTC[WizardFireCharges].IntValue && cvarBTC[WizardFireCharges].IntValue > 1)
-			{
-			    this.fFireCooldown = GetEngineTime() + cvarBTC[WizardFireCooldown].FloatValue;
-			}
-		}
-		if(this.fBatsCooldown <= GetEngineTime() && this.iBatsCharges < cvarBTC[WizardBatsCharges].IntValue)
-		{
-			this.iBatsCharges++;
-			if(this.iBatsCharges < cvarBTC[WizardBatsCharges].IntValue && cvarBTC[WizardBatsCharges].IntValue > 1)
-			{
-			    this.fBatsCooldown = GetEngineTime() + cvarBTC[WizardBatsCooldown].FloatValue;
-			}
-		}
-		if(this.fUberCooldown <= GetEngineTime() && this.iUberCharges < cvarBTC[WizardUberCharges].IntValue)
-		{
-			this.iUberCharges++;
-			if(this.iUberCharges < cvarBTC[WizardUberCharges].IntValue && cvarBTC[WizardUberCharges].IntValue > 1)
-			{
-			    this.fUberCooldown = GetEngineTime() + cvarBTC[WizardUberCooldown].FloatValue;
-			}
-		}
-		if(this.fJumpCooldown <= GetEngineTime() && this.iJumpCharges < cvarBTC[WizardJumpCharges].IntValue)
-		{
-			this.iJumpCharges++;
-			if(this.iJumpCharges < cvarBTC[WizardJumpCharges].IntValue && cvarBTC[WizardJumpCharges].IntValue > 1)
-			{
-			    this.fJumpCooldown = GetEngineTime() + cvarBTC[WizardJumpCooldown].FloatValue;
-			}
-		}
-		if(this.fInvisCooldown <= GetEngineTime() && this.iInvisCharges < cvarBTC[WizardInvisCharges].IntValue)
-		{
-			this.iInvisCharges++;
-			if(this.iInvisCharges < cvarBTC[WizardInvisCharges].IntValue && cvarBTC[WizardInvisCharges].IntValue > 1)
-			{
-			    this.fInvisCooldown = GetEngineTime() + cvarBTC[WizardInvisCooldown].FloatValue;
-			}
-		}
-		if(this.fMeteorCooldown <= GetEngineTime() && this.iMeteorCharges < cvarBTC[WizardMeteorCharges].IntValue)
-		{
-			this.iMeteorCharges++;
-			if(this.iMeteorCharges < cvarBTC[WizardMeteorCharges].IntValue && cvarBTC[WizardMeteorCharges].IntValue > 1)
-			{
-			    this.fMeteorCooldown = GetEngineTime() + cvarBTC[WizardMeteorCooldown].FloatValue;
-			}
-		}
-		if(this.fMonoCooldown <= GetEngineTime() && this.iMonoCharges < cvarBTC[WizardMonoCharges].IntValue)
-		{
-			this.iMonoCharges++;
-			if(this.iMonoCharges < cvarBTC[WizardMonoCharges].IntValue && cvarBTC[WizardMonoCharges].IntValue > 1)
-			{
-				this.fMonoCooldown = GetEngineTime() + cvarBTC[WizardMonoCooldown].FloatValue;
-			}
-		}
-
-		int iSpellbook = FindSpellBook(this.index);
-
-		if((GetClientButtons(this.index) & IN_RELOAD) && this.fAntiSpamCooldown <= GetEngineTime())
-		{
-			if(this.iSelectedSpell >= 7) // Increase this if we add more
-			{
-				this.iSelectedSpell = 1;
-			}
-			else
-			{
-				this.iSelectedSpell++;
-			}
-			RequestFrame(ResetSpellCharges, this.index);
-			this.fAntiSpamCooldown = GetEngineTime() + 0.3;
-		}
-
-		SetEntProp(iSpellbook, Prop_Send, "m_iSelectedSpellIndex", this.iSpelltype); // No need to call it 7 times if we can just set it here
-
-		if((GetClientButtons(this.index) & IN_ATTACK2) && this.IsReady() && !TF2_IsPlayerInCondition(this.index, view_as<TFCond>(50)) && this.fCooldown < GetEngineTime()) { // Cast mechanic
-			if(this.iSpelltype == 0 && this.iFireCharges > 0 && this.fMana >= cvarBTC[WizardFireCost].FloatValue) { // Fire spell
-				this.fFireCooldown = GetEngineTime() + cvarBTC[WizardFireCooldown].FloatValue;
-				this.iFireCharges--;
-				this.fMana -= cvarBTC[WizardFireCost].FloatValue;
-			}
-			else if(this.iSpelltype == 1 && this.iBatsCharges > 0 && this.fMana >= cvarBTC[WizardBatsCost].FloatValue) { // Bats
-				this.fBatsCooldown = GetEngineTime() + cvarBTC[WizardBatsCooldown].FloatValue;
-				this.iBatsCharges--;
-				this.fMana -= cvarBTC[WizardBatsCost].FloatValue;
-			}
-			else if(this.iSpelltype == 2 && this.iUberCharges > 0 && this.fMana >= cvarBTC[WizardUberCost].FloatValue) { // Uber
-				this.fUberCooldown = GetEngineTime() + cvarBTC[WizardUberCooldown].FloatValue;
-				this.iUberCharges--;
-				this.fMana -= cvarBTC[WizardUberCost].FloatValue;
-			}
-			else if(this.iSpelltype == 4 && this.iJumpCharges > 0 && this.fMana >= cvarBTC[WizardJumpCost].FloatValue) { // Jump spell
-				this.fJumpCooldown = GetEngineTime() + cvarBTC[WizardJumpCooldown].FloatValue;
-				this.iJumpCharges--;
-				this.fMana -= cvarBTC[WizardJumpCost].FloatValue;
-			}
-			else if(this.iSpelltype == 5 && this.iInvisCharges > 0 && this.fMana >= cvarBTC[WizardInvisCost].FloatValue) { // Invis
-				this.fInvisCooldown = GetEngineTime() + cvarBTC[WizardInvisCooldown].FloatValue;
-				this.iInvisCharges--;
-				this.fMana -= cvarBTC[WizardInvisCost].FloatValue;
-			}
-			else if(this.iSpelltype == 9 && this.iMeteorCharges > 0 && this.fMana >= cvarBTC[WizardMeteorCost].FloatValue) { // Meteor Spell
-				this.fMeteorCooldown = GetEngineTime() + cvarBTC[WizardMeteorCooldown].FloatValue;
-				this.iMeteorCharges--;
-				this.fMana -= cvarBTC[WizardMeteorCost].FloatValue;
-			}
-			else if(this.iSpelltype == 10 && this.iMonoCharges > 0 && this.fMana >= cvarBTC[WizardMonoCost].FloatValue) { // Monoculus
-				this.fMonoCooldown = GetEngineTime() + cvarBTC[WizardMonoCooldown].FloatValue;
-				this.iMonoCharges--;
-				this.fMana -= cvarBTC[WizardMonoCost].FloatValue;
-			}
-			else {
-				return;
-			}
-
-			char MedSound[35];
-			float fWizardPos[3];
-
-			switch(this.iCastSound) {
-				case 0: //Fire spell cast sound
-					Format(MedSound, sizeof(MedSound), "vo/merasmus/spell_cast_fire%i.mp3", GetRandomInt(1, 4));
-				case 1: //Common spell cast sound
-					Format(MedSound, sizeof(MedSound), "vo/merasmus/spell_cast%i.mp3", GetRandomInt(1, 7));
-				case 9: //Rare spell cast sound
-					Format(MedSound, sizeof(MedSound), "vo/merasmus/spell_cast_rare%i.mp3", GetRandomInt(1, 2));
-				default:
-					return;
-			}
-			SetEntProp(iSpellbook, Prop_Send, "m_iSpellCharges", 1);
-			GetClientAbsOrigin(this.index, fWizardPos);
-			EmitSoundToAll(MedSound, this.index, _, _, _, 0.5, _, _, fWizardPos, _, false);
-			FakeClientCommand(this.index, "use tf_weapon_spellbook");
-			this.fCooldown = GetEngineTime() + 2.5; // 2.5s before next cast
-			SetPawnTimer(ResetSpellCharges, 0.5, this.index);
-		}
-	}
-	public void UpdateHUD()
-	{
-		SetHudTextParams(-1.0, 0.75, 0.5, 255, 255, 255, 255, 2, 0.0, 0.0, 0.0);
-		if(TF2_IsPlayerInCondition(this.index, view_as<TFCond>(50))) { // Sapped
-			ShowSyncHudText(this.index, StatusHUD, "Your magic is being jammed! Run Away!");
+		if(TF2_IsPlayerInCondition(this.index, view_as<TFCond>(50)) || TF2_IsPlayerInCondition(this.index, view_as<TFCond>(15))) { // Sapped or scared
+			this.UpdateHUD(this.index, StatusHUD, "Your magic is being jammed! Run Away!", -1.0, 0.75, 0.5, 255, 255, 255, 255, 2, 0.0, 0.0, 0.0);
 		}
 		else
-			ShowSyncHudText(this.index, StatusHUD, "");
+			this.UpdateHUD(this.index, StatusHUD, "", -1.0, 0.75, 0.5, 255, 255, 255, 255, 2, 0.0, 0.0, 0.0);
 		
 		char SpellHUDText[255]; // Display of current selected spell
 		char CoolHUDText[255];
 
-		float fireCooldown = this.fFireCooldown - GetEngineTime();
-		if(fireCooldown < 0.0)
-			fireCooldown = 0.0;
-		float batsCooldown = this.fBatsCooldown - GetEngineTime();
-		if(batsCooldown < 0.0)
-			batsCooldown = 0.0;
-		float uberCooldown = this.fUberCooldown - GetEngineTime();
-		if(uberCooldown < 0.0)
-			uberCooldown = 0.0;
-		float jumpCooldown = this.fJumpCooldown - GetEngineTime();
-		if(jumpCooldown < 0.0)
-			jumpCooldown = 0.0;
-		float invisCooldown = this.fInvisCooldown - GetEngineTime();
-		if(invisCooldown < 0.0)
-			invisCooldown = 0.0;
-		float meteorCooldown = this.fMeteorCooldown - GetEngineTime();
-		if(meteorCooldown < 0.0)
-			meteorCooldown = 0.0;
-		float monoCooldown = this.fMonoCooldown - GetEngineTime();
-		if(monoCooldown < 0.0)
-			monoCooldown = 0.0;
+		this.fFireCooldown -= 0.1;
+		if(this.fFireCooldown < 0.0)
+			this.fFireCooldown = 0.0;
+		this.fBatsCooldown -= 0.1;
+		if(this.fBatsCooldown < 0.0)
+			this.fBatsCooldown = 0.0;
+		this.fUberCooldown -= 0.1;
+		if(this.fUberCooldown < 0.0)
+			this.fUberCooldown = 0.0;
+		this.fJumpCooldown -= 0.1;
+		if(this.fJumpCooldown < 0.0)
+			this.fJumpCooldown = 0.0;
+		this.fInvisCooldown -= 0.1;
+		if(this.fInvisCooldown < 0.0)
+			this.fInvisCooldown = 0.0;
+		this.fMeteorCooldown -= 0.1;
+		if(this.fMeteorCooldown < 0.0)
+			this.fMeteorCooldown = 0.0;
+		this.fMonoCooldown -= 0.1;
+		if(this.fMonoCooldown < 0.0)
+			this.fMonoCooldown = 0.0;
 
-		Format(CoolHUDText, sizeof(CoolHUDText), "              (%i) %i\n              (%i) %i\n              (%i) %i\n              (%i) %i\n              (%i) %i\n              (%i) %i\n              (%i) %i\n", this.iFireCharges, RoundToZero(fireCooldown), this.iBatsCharges, RoundToZero(batsCooldown), this.iUberCharges, RoundToZero(uberCooldown), this.iJumpCharges, RoundToZero(jumpCooldown), this.iInvisCharges, RoundToZero(invisCooldown), this.iMeteorCharges, RoundToZero(meteorCooldown), this.iMonoCharges, RoundToZero(monoCooldown));
+		Format(CoolHUDText, sizeof(CoolHUDText), "              (%i) %i\n              (%i) %i\n              (%i) %i\n              (%i) %i\n              (%i) %i\n              (%i) %i\n              (%i) %i\n", this.iFireCharges, RoundToZero(this.fFireCooldown), this.iBatsCharges, RoundToZero(this.fBatsCooldown), this.iUberCharges, RoundToZero(this.fUberCooldown), this.iJumpCharges, RoundToZero(this.fJumpCooldown), this.iInvisCharges, RoundToZero(this.fInvisCooldown), this.iMeteorCharges, RoundToZero(this.fMeteorCooldown), this.iMonoCharges, RoundToZero(this.fMonoCooldown));
 		switch(this.iSelectedSpell) {
 			case 1: {
 				Format(SpellHUDText, sizeof(SpellHUDText), ">Fire\n Bats\n Uber\n Jump\n Invis\n Meteor\n Mono\n Mana: %i", RoundToZero(this.fMana));
@@ -620,12 +486,161 @@ methodmap CWizard < BaseClass
 				this.iCastSound = 9;
 			}
 		}
-		SetHudTextParams(0.0, -1.0, 0.5, 0, 255, 0, 255, 2, 0.0, 0.0, 0.0);
-
 		if(IsClientAlive(this.index))
 		{
-			ShowSyncHudText(this.index, SpellHUD, SpellHUDText);
-			ShowSyncHudText(this.index, CoolHUD, CoolHUDText);
+			this.UpdateHUD(this.index, SpellHUD, SpellHUDText, 0.0, -1.0, 0.5, 0, 255, 0, 255, 2, 0.0, 0.0, 0.0);
+			this.UpdateHUD(this.index, CoolHUD, CoolHUDText, 0.0, -1.0, 0.5, 0, 255, 0, 255, 2, 0.0, 0.0, 0.0);
+		}
+		
+		char sModel[128];
+		GetEntPropString(this.index, Prop_Data, "m_ModelName", sModel, sizeof(sModel)); // Get the complete Modelname.
+		if(StrEqual(sModel, Sniper_Model, false)) { // Bug fix, removing quads turns the player to default sniper model
+			SetVariantString(Wizard_Model);
+			AcceptEntityInput(this.index, "SetCustomModel");
+			SetEntProp(this.index, Prop_Send, "m_bUseClassAnimations", 1);
+		}
+
+		if(this.fMana < cvarBTC[WizardMana].FloatValue) // This should reflect the scale a bit better
+		{
+			this.fMana += cvarBTC[WizardManaRegen].FloatValue;
+		}
+		if(this.fMana > cvarBTC[WizardMana].FloatValue)
+			this.fMana = cvarBTC[WizardMana].FloatValue;
+
+		if(this.fFireCooldown <= 0.0 && this.iFireCharges < cvarBTC[WizardFireCharges].IntValue)
+		{
+			this.iFireCharges++;
+			if(this.iFireCharges < cvarBTC[WizardFireCharges].IntValue && cvarBTC[WizardFireCharges].IntValue > 1)
+			{
+			    this.fFireCooldown = cvarBTC[WizardFireCooldown].FloatValue;
+			}
+		}
+		if(this.fBatsCooldown <= 0.0 && this.iBatsCharges < cvarBTC[WizardBatsCharges].IntValue)
+		{
+			this.iBatsCharges++;
+			if(this.iBatsCharges < cvarBTC[WizardBatsCharges].IntValue && cvarBTC[WizardBatsCharges].IntValue > 1)
+			{
+			    this.fBatsCooldown = cvarBTC[WizardBatsCooldown].FloatValue;
+			}
+		}
+		if(this.fUberCooldown <= 0.0 && this.iUberCharges < cvarBTC[WizardUberCharges].IntValue)
+		{
+			this.iUberCharges++;
+			if(this.iUberCharges < cvarBTC[WizardUberCharges].IntValue && cvarBTC[WizardUberCharges].IntValue > 1)
+			{
+			    this.fUberCooldown = cvarBTC[WizardUberCooldown].FloatValue;
+			}
+		}
+		if(this.fJumpCooldown <= 0.0 && this.iJumpCharges < cvarBTC[WizardJumpCharges].IntValue)
+		{
+			this.iJumpCharges++;
+			if(this.iJumpCharges < cvarBTC[WizardJumpCharges].IntValue && cvarBTC[WizardJumpCharges].IntValue > 1)
+			{
+			    this.fJumpCooldown = cvarBTC[WizardJumpCooldown].FloatValue;
+			}
+		}
+		if(this.fInvisCooldown <= 0.0 && this.iInvisCharges < cvarBTC[WizardInvisCharges].IntValue)
+		{
+			this.iInvisCharges++;
+			if(this.iInvisCharges < cvarBTC[WizardInvisCharges].IntValue && cvarBTC[WizardInvisCharges].IntValue > 1)
+			{
+			    this.fInvisCooldown = cvarBTC[WizardInvisCooldown].FloatValue;
+			}
+		}
+		if(this.fMeteorCooldown <= 0.0 && this.iMeteorCharges < cvarBTC[WizardMeteorCharges].IntValue)
+		{
+			this.iMeteorCharges++;
+			if(this.iMeteorCharges < cvarBTC[WizardMeteorCharges].IntValue && cvarBTC[WizardMeteorCharges].IntValue > 1)
+			{
+			    this.fMeteorCooldown = cvarBTC[WizardMeteorCooldown].FloatValue;
+			}
+		}
+		if(this.fMonoCooldown <= 0.0 && this.iMonoCharges < cvarBTC[WizardMonoCharges].IntValue)
+		{
+			this.iMonoCharges++;
+			if(this.iMonoCharges < cvarBTC[WizardMonoCharges].IntValue && cvarBTC[WizardMonoCharges].IntValue > 1)
+			{
+				this.fMonoCooldown = cvarBTC[WizardMonoCooldown].FloatValue;
+			}
+		}
+
+		int iSpellbook = FindSpellBook(this.index);
+
+		if((GetClientButtons(this.index) & IN_RELOAD) && this.fAntiSpamCooldown <= 0.0)
+		{
+			if(this.iSelectedSpell >= 7) // Increase this if we add more
+			{
+				this.iSelectedSpell = 1;
+			}
+			else
+			{
+				this.iSelectedSpell++;
+			}
+			RequestFrame(ResetSpellCharges, this.index);
+			this.fAntiSpamCooldown = 0.3;
+		}
+
+		SetEntProp(iSpellbook, Prop_Send, "m_iSelectedSpellIndex", this.iSpelltype); // No need to call it 7 times if we can just set it here
+
+		if((GetClientButtons(this.index) & IN_ATTACK2) && this.IsReady() && !TF2_IsPlayerInCondition(this.index, view_as<TFCond>(50)) && this.fCooldown <= 0.0) { // Cast mechanic
+			if(this.iSpelltype == 0 && this.iFireCharges > 0 && this.fMana >= cvarBTC[WizardFireCost].FloatValue) { // Fire spell
+				this.fFireCooldown = cvarBTC[WizardFireCooldown].FloatValue;
+				this.iFireCharges--;
+				this.fMana -= cvarBTC[WizardFireCost].FloatValue;
+			}
+			else if(this.iSpelltype == 1 && this.iBatsCharges > 0 && this.fMana >= cvarBTC[WizardBatsCost].FloatValue) { // Bats
+				this.fBatsCooldown = cvarBTC[WizardBatsCooldown].FloatValue;
+				this.iBatsCharges--;
+				this.fMana -= cvarBTC[WizardBatsCost].FloatValue;
+			}
+			else if(this.iSpelltype == 2 && this.iUberCharges > 0 && this.fMana >= cvarBTC[WizardUberCost].FloatValue) { // Uber
+				this.fUberCooldown = cvarBTC[WizardUberCooldown].FloatValue;
+				this.iUberCharges--;
+				this.fMana -= cvarBTC[WizardUberCost].FloatValue;
+			}
+			else if(this.iSpelltype == 4 && this.iJumpCharges > 0 && this.fMana >= cvarBTC[WizardJumpCost].FloatValue) { // Jump spell
+				this.fJumpCooldown = cvarBTC[WizardJumpCooldown].FloatValue;
+				this.iJumpCharges--;
+				this.fMana -= cvarBTC[WizardJumpCost].FloatValue;
+			}
+			else if(this.iSpelltype == 5 && this.iInvisCharges > 0 && this.fMana >= cvarBTC[WizardInvisCost].FloatValue) { // Invis
+				this.fInvisCooldown = cvarBTC[WizardInvisCooldown].FloatValue;
+				this.iInvisCharges--;
+				this.fMana -= cvarBTC[WizardInvisCost].FloatValue;
+			}
+			else if(this.iSpelltype == 9 && this.iMeteorCharges > 0 && this.fMana >= cvarBTC[WizardMeteorCost].FloatValue) { // Meteor Spell
+				this.fMeteorCooldown = cvarBTC[WizardMeteorCooldown].FloatValue;
+				this.iMeteorCharges--;
+				this.fMana -= cvarBTC[WizardMeteorCost].FloatValue;
+			}
+			else if(this.iSpelltype == 10 && this.iMonoCharges > 0 && this.fMana >= cvarBTC[WizardMonoCost].FloatValue) { // Monoculus
+				this.fMonoCooldown = cvarBTC[WizardMonoCooldown].FloatValue;
+				this.iMonoCharges--;
+				this.fMana -= cvarBTC[WizardMonoCost].FloatValue;
+			}
+			else {
+				return;
+			}
+
+			char MedSound[35];
+			float fWizardPos[3];
+
+			switch(this.iCastSound) {
+				case 0: //Fire spell cast sound
+					Format(MedSound, sizeof(MedSound), "vo/merasmus/spell_cast_fire%i.mp3", GetRandomInt(1, 4));
+				case 1: //Common spell cast sound
+					Format(MedSound, sizeof(MedSound), "vo/merasmus/spell_cast%i.mp3", GetRandomInt(1, 7));
+				case 9: //Rare spell cast sound
+					Format(MedSound, sizeof(MedSound), "vo/merasmus/spell_cast_rare%i.mp3", GetRandomInt(1, 2));
+				default:
+					Format(MedSound, sizeof(MedSound), "vo/merasmus/spell_cast%i.mp3", GetRandomInt(1, 7)); // Go to common spell as fallback
+			}
+			SetEntProp(iSpellbook, Prop_Send, "m_iSpellCharges", 1);
+			GetClientAbsOrigin(this.index, fWizardPos);
+			EmitSoundToAll(MedSound, this.index, _, _, _, 0.5, _, _, fWizardPos, _, false);
+			FakeClientCommand(this.index, "use tf_weapon_spellbook");
+			this.fCooldown = 2.5; // 2.5s before next cast
+			SetPawnTimer(ResetSpellCharges, 0.5, this.index);
 		}
 	}
 	public void OnConditionAdded(TFCond condition)
@@ -657,9 +672,8 @@ public void SetupWizard(CWizard wizard) {
 	if(!StrEqual(sModel, Wizard_Model, false) && (wizard.iTeam == FF2_GetBossTeam() || FF2_GetBossIndex(wizard.index) != -1))
 	{
 		wizard.iClassType = None;
-		SetHudTextParams(0.0, -1.0, 0.5, 0, 255, 0, 255, 2, 0.0, 0.0, 0.0);
-		ShowSyncHudText(wizard.index, SpellHUD, "");
-		ShowSyncHudText(wizard.index, CoolHUD, "");
+		wizard.UpdateHUD(wizard.index, SpellHUD, "", 0.0, -1.0, 0.5, 0, 255, 0, 255, 2, 0.0, 0.0, 0.0);
+		wizard.UpdateHUD(wizard.index, CoolHUD, "", 0.0, -1.0, 0.5, 0, 255, 0, 255, 2, 0.0, 0.0, 0.0);
 		return;
 	}
 	if(IsClientHere(wizard.index)) { // Assuming we're using normal or quad model)
@@ -671,15 +685,15 @@ public void SetupWizard(CWizard wizard) {
 		wizard.RemoveAllItems();
 
 		//Cooldowns
-		wizard.fCooldown = GetEngineTime() + 1.0; // 1s
+		wizard.fCooldown = 1.0; // 1s
 		wizard.fAntiSpamCooldown = 0.0;
 		wizard.fFireCooldown = 0.0;
 		wizard.fBatsCooldown = 0.0;
-		wizard.fUberCooldown = GetEngineTime() + 15.0;
-		wizard.fJumpCooldown = GetEngineTime() + 6.0;
-		wizard.fInvisCooldown = GetEngineTime() + 7.0;
-		wizard.fMeteorCooldown = GetEngineTime() + 25.0;
-		wizard.fMonoCooldown = GetEngineTime() + 20.0;
+		wizard.fUberCooldown = 15.0;
+		wizard.fJumpCooldown = 6.0;
+		wizard.fInvisCooldown = 7.0;
+		wizard.fMeteorCooldown = 25.0;
+		wizard.fMonoCooldown = 20.0;
 		//SpellCharges
 		wizard.iFireCharges = 2; //Fire
 		wizard.iBatsCharges = 1; //Bats

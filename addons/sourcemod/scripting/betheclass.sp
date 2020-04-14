@@ -11,9 +11,7 @@ Attempt at creating a custom class hub -Blue
 #include <tf2items>
 #include <betheclass>
 #undef REQUIRE_PLUGIN
-#tryinclude <ClassRestrictionsForHumans>
 #tryinclude <freak_fortress_2>
-#tryinclude <vsh2>
 #define REQUIRE_PLUGIN
 
 #define int(%1)	view_as<int>(%1)
@@ -85,12 +83,11 @@ enum /* Forwards */ {
 }
 
 bool g_vsh2 = false;
-ConVar vsh2_enabled;
 
 ConVar bEnabled = null;
 ConVar cvarBTC[VersionNumber+1]; // Don't touch, add cvars in enum above
 
-//Handle forwardBTC[OnMercenaryGrenadeThrow];
+Handle forwardBTC[OnMercenaryGrenadeThrow];
 
 // Define handles
 Handle
@@ -203,6 +200,11 @@ methodmap BaseClass
 		}
 		TF2_RemoveAllWeapons(this.index);
 	}
+	public void UpdateHUD(int client, Handle hHUD, const char[] text, float x, float y, float holdTime, int r, int g, int b, int a, int effect, float fxTime, float fadeIn, float fadeOut)
+	{
+		SetHudTextParams(x, y, holdTime, r, g, b, a, effect, fxTime, fadeIn, fadeOut);
+		ShowSyncHudText(client, hHUD, text);
+	}
 }
 
 // Add any external files here
@@ -214,7 +216,6 @@ methodmap BaseClass
 public void OnLibraryAdded(const char[] name) {
 	if( StrEqual(name, "VSH2") ) {
 		g_vsh2 = true;
-		vsh2_enabled = FindConVar("vsh2_enabled");
 	}
 }
 
@@ -368,10 +369,14 @@ public void OnMapStart()
 {
 	PrecacheSound(SOUND_RECHARGE, true);
 #if defined _vsh2_included
-	if(g_vsh2 && vsh2_enabled.BoolValue)
+	if(g_vsh2)
 		VSH2_Hook(OnRedPlayerThink, VSH2_BaseThink);
 	else
-		CreateTimer(0.1, Timer_BaseThink, _, TIMER_REPEAT|TIMER_FLAG_NO_MAPCHANGE);
+		CreateTimer(0.1, BaseThink, _, TIMER_REPEAT|TIMER_FLAG_NO_MAPCHANGE);
+#endif
+#if !defined _vsh2_included
+	CreateTimer(0.1, BaseThink, _, TIMER_REPEAT|TIMER_FLAG_NO_MAPCHANGE);
+#endif
 }
 
 public void OnRoundStart(Event event, const char[] name, bool dontBroadcast)
@@ -429,7 +434,7 @@ public Action OnPlayerSpawn(Event event, const char[] name, bool dontBroadcast)
 		return Plugin_Continue;
 #endif
 	
-	iPreset = baseplayer.iPresetType;
+	BTCClass iPreset = baseplayer.iPresetType;
 
 	Action action = Plugin_Continue;
 	Call_StartForward(forwardBTC[OnSpawn]);
@@ -442,21 +447,12 @@ public Action OnPlayerSpawn(Event event, const char[] name, bool dontBroadcast)
 	}
 
 	TF2Attrib_RemoveAll(baseplayer.index);
-	SetVariantString("");
-	AcceptEntityInput(baseplayer.index, "SetCustomModel");
-
-	SDKUnhook(baseplayer.index, SDKHook_PreThinkPost, OnBaseThink); // Prevent double hooks
-
-	if(!SDKHookEx(baseplayer.index, SDKHook_PreThinkPost, OnBaseThink)) {
-		PrintToChat(baseplayer.index, "\x01\x070066BB[BeTheClass]\x01 Failed to setup custom class.")
-		baseplayer.iClassType = None;
-		return Plugin_Continue;
-	}
 	
 	switch(baseplayer.iPresetType) {
 		case None: {
 			baseplayer.iClassType = None;
-			SDKUnhook(baseplayer.index, SDKHook_PreThinkPost, OnBaseThink);
+			SetVariantString("");
+			AcceptEntityInput(baseplayer.index, "SetCustomModel");
 		}
 		case Wizard: {
 			if( CalcLimit(Wizard) < cvarBTC[WizardLimit].IntValue ) {
@@ -473,7 +469,8 @@ public Action OnPlayerSpawn(Event event, const char[] name, bool dontBroadcast)
 		default: { // In case we're going out of index
 			baseplayer.iPresetType = None;
 			baseplayer.iClassType = None;
-			SDKUnhook(baseplayer.index, SDKHook_PreThinkPost, OnBaseThink);
+			SetVariantString("");
+			AcceptEntityInput(baseplayer.index, "SetCustomModel");
 		}
 	}
 	return Plugin_Continue;
@@ -504,33 +501,20 @@ public Action OnPlayerHurt(Event event, const char[] name, bool dontBroadcast)
 	if(!bEnabled.BoolValue)
 		return Plugin_Continue;
 	BaseClass victim = BaseClass(event.GetInt("userid"), true);
+	BaseClass attacker = BaseClass(event.GetInt("attacker"), true);
 	if(IsValidClient(victim.index)) { // Fix bots playing Wizard sounds
 		switch(victim.iClassType) {
 			case None:	{}
 			case Wizard: {
-				if(event.GetInt("health") > 0 && event.GetInt("damageamount") > 0) {
-					float fWizardPos[3];
-					char medSound[35];
-					GetClientAbsOrigin(victim.index, fWizardPos);
-					Format(medSound, sizeof(medSound), "vo/merasmus/sf12_pain0%i.mp3", GetRandomInt(1, 6));
-					EmitSoundToAll(medSound, victim.index, _, _, _, 0.3, _, _, fWizardPos, _, false);
-				}
+				ToCWizard(victim).OnHurt(attacker, victim, event);
 			}
 		}
 	}
-	BaseClass attacker = BaseClass(event.GetInt("attacker"), true);
-	if(victim.index == attacker.index || attacker.index <= 0)
-		return Plugin_Continue;
 	if(IsValidClient(attacker.index)) {
 		switch(attacker.iClassType) {
 			case None:		{}
 			case Wizard:	{
-				if(GetEntPropEnt(attacker.index, Prop_Send, "m_hActiveWeapon") == GetPlayerWeaponSlot(attacker.index, TFWeaponSlot_Melee) && event.GetInt("custom") == 0 /* Spells should have a custom value */ ) {
-					ToCWizard(attacker).fMana += cvarBTC[WizardManaOnHit].FloatValue; // Award 10 mana on melee hit
-					if(ToCWizard(attacker).fInvisBonus > GetEngineTime()) {
-						ToCWizard(attacker).fMana += cvarBTC[WizardInvisBonus].FloatValue;
-					}
-				}
+				ToCWizard(attacker).OnDamage(attacker, victim, event);
 			}
 		}
 	}
@@ -580,39 +564,8 @@ public Action OnItemPickUp(Event event, const char[] eventName, bool dontBroadca
 	return Plugin_Continue;
 }
 
-/*public void OnGameFrame()
+public Action BaseThink(Handle hTimer)
 {
-	if(!bEnabled.BoolValue || FF2_GetRoundState() <= 0) {
-		return Plugin_Continue;
-	}
-
-	BaseClass baseplayer;
-	for( int i=MaxClients ; i > 0 ; i-- ) {
-		if( !IsValidClient(i) )
-			continue;
-
-		baseplayer = BaseClass(i);
-		switch(baseplayer.iClassType) {
-			case None:		{}
-			case Wizard:	ToCWizard(baseplayer).Think();
-			case Mercenary:	ToCMercenary(baseplayer).Think();
-		}
-	}
-	return Plugin_Continue;
-}*/
-
-public Action BaseThink()
-{
-#if defined _FF2_included
-	if(FF2_GetRoundState() <= 0)
-		return Plugin_Continue;
-#endif
-
-#if defined _vsh2_included
-	if(!VSH2GameMode_GetPropInt("iRoundState") <= 0)
-		return Plugin_Continue;
-#endif
-
 	if(!bEnabled.BoolValue)
 		return Plugin_Continue;
 
@@ -634,7 +587,7 @@ public Action BaseThink()
 #if defined _vsh2_included
 public Action VSH2_BaseThink(const VSH2Player player)
 {
-	if(!g_vsh2 || vsh2_enabled.BoolValue)
+	if(!g_vsh2)
 		return Plugin_Continue;
 	
 	if(!bEnabled.BoolValue)
@@ -659,20 +612,6 @@ public int CalcLimit(BTCClass iClass)
 	return total;
 }
 
-#if defined _classrestrictionsforhumans_included
-public Action CRH_CountTowardsLimit(int iClient)
-{
-	if(!bEnabled.BoolValue)
-		return Plugin_Continue;
-	BaseClass baseplayer = BaseClass(iClient);
-	if(baseplayer.iClassType > None || (baseplayer.iPresetType > None && FF2_GetBossIndex(iClient) == -1 && FF2_GetRoundState() == 0)) {
-		return Plugin_Handled;
-	}
-
-	return Plugin_Continue;
-}
-#endif
-
 // TF2 event handling
 public void TF2_OnConditionAdded(int iClient, TFCond condition)
 {
@@ -694,7 +633,7 @@ public void TF2_OnConditionRemoved(int iClient, TFCond condition)
 		case None:	{}
 		case Wizard:	{
 			if(condition == TFCond_Stealthed) {
-				ToCWizard(baseplayer).fInvisBonus = GetEngineTime() + 0.8;
+				ToCWizard(baseplayer).fInvisBonus = 0.8;
 			}
 		}
 	}
