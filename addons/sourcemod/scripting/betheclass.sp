@@ -11,6 +11,7 @@ Attempt at creating a custom class hub -Blue
 #include <tf2items>
 #include <betheclass>
 #undef REQUIRE_PLUGIN
+#tryinclude <vsh2>
 #tryinclude <freak_fortress_2>
 #define REQUIRE_PLUGIN
 
