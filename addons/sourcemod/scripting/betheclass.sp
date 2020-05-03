@@ -251,8 +251,7 @@ public Action OnResupply(Event event, const char[] name, bool dontBroadcast) {
 }
 
 public void OnClientPutInServer(int client) {
-	BaseClass baseplayer = BaseClass(client);
-	baseplayer.iPresetType = 0;
+	g_btc.m_hPlayerFields[client].SetValue("iPresetType", 0);
 }
 
 public void OnClientDisconnect(int client) {
@@ -270,11 +269,12 @@ public void OnMapStart() {
 }
 
 public Action Timer_PlayerThink(Handle hTimer) {
+	BaseClass player;
 	for(int i=MaxClients; i; --i) {
 		if(!IsValidClient(i, false))
 			continue;
 		
-		BaseClass player = BaseClass(i);
+		player = BaseClass(i);
 
 		Call_StartForward(g_btc.m_hForwards[OnClassThink]);
 		Call_PushCell(player);
