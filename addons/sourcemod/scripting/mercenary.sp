@@ -56,6 +56,9 @@ public void OnPluginStart() {
 	g_btc_mercenary.m_hCvars[MercenaryGrenade] = CreateConVar("btc_mercenary_grenade", "2", "Grenade stock limit for mercenaries", FCVAR_NOTIFY, true, 0.0, false, 0.0);
 	g_btc_mercenary.m_hCvars[MercenaryGrenadeRegen] = CreateConVar("btc_mercenary_grenade_regen", "60.0", "Regen interval for grenades for mercenaries", FCVAR_NOTIFY, true, 0.0, false, 0.0);
 
+	for( int i; i<MaxBTCMercHUDs; i++ )
+		g_btc_mercenary.m_hHUDs[i] = CreateHudSynchronizer();
+
 	HookEvent("item_pickup", OnItemPickUp, EventHookMode_Pre);
 }
 
@@ -136,38 +139,28 @@ methodmap CMercenary < BTCBaseClass
 	}
 	public void OnSpawn()
 	{
-		char sModel[128];
-		GetEntPropString(this.index, Prop_Data, "m_ModelName", sModel, sizeof(sModel)); // Get the complete Modelname.
-		if(!StrEqual(sModel, Merc_Model, false))
-		{
-			this.iClassType = 0;
-			this.UpdateHUD(g_btc_mercenary.m_hHUDs[GrenadeHUD], "", 0.75, 0.85, 0.5, 255, 255, 255, 255, 2, 0.0, 0.0, 0.0);
-			return;
-		}
-		if(IsValidClient(this.index)) {
-			TF2_SetPlayerClass(this.index, TFClass_Soldier, _, false);
-			SetBaseSpeed(this.index, 300.0);
-			TF2Attrib_SetByName(this.index, "max health additive penalty", -50.0);
-			SetEntityHealth(this.index, 175);
+		TF2_SetPlayerClass(this.index, TFClass_Soldier, _, false);
+		SetBaseSpeed(this.index, 300.0);
+		TF2Attrib_SetByName(this.index, "max health additive penalty", -50.0);
+		SetEntityHealth(this.index, 175);
 
-			this.RemoveAllItems();
+		this.RemoveAllItems(true);
 
-			// Grenades
-			this.iGrenadeStock = g_btc_mercenary.m_hCvars[MercenaryGrenade].IntValue;
-			this.fGrenadeThrowCooldown = 0.0;
-			this.fGrenadeCooldown = 0.0;
+		// Grenades
+		this.iGrenadeStock = g_btc_mercenary.m_hCvars[MercenaryGrenade].IntValue;
+		this.fGrenadeThrowCooldown = 0.0;
+		this.fGrenadeCooldown = 0.0;
 
-			SetVariantString(Merc_Model);
-			AcceptEntityInput(this.index, "SetCustomModel");
-			SetEntProp(this.index, Prop_Send, "m_bUseClassAnimations", 1);
-			this.SpawnWeapon("tf_weapon_scattergun", 1153, 1, 0, "2030 ; 1 ; 808 ; 0 ; 1 ; 1 ; 6 ; 0.75 ; 106 ; 0.75 ; 547 ; 1");
-			this.SpawnWeapon("tf_weapon_smg", 1098, 1, 0, "306 ; 0 ; 647 ; 0 ; 392 ; 0.5 ; 4 ; 1.2 ; 2 ; 1.5 ; 106 ; 0.5 ; 96 ; 3.0 ; 144 ; 1 ; 51 ; 0 ; 78 ; 6.25");
-			this.SpawnWeapon("tf_weapon_shovel", 30758, 1, 0, "2030 ; 1 ; 149 ; 3 ; 851 ; 1.15 ; 1 ; 0.9 ; 851 ; 1,4375‬");
-			this.SpawnWeapon("tf_weapon_grapplinghook", 1152, 1, 0, "547 ; 1 ; 199 ; 1 ; 289 ; 1");
-			//this.SpawnWeapon(merc.index, "tf_weapon_spellbook", 1132, 1, 0, "547 ; 0 ; 199 ; 0 ; 289 ; 1 ; 643 ; 0.125 ; 280 ; 2");
-			SetAmmo(this.index, TFWeaponSlot_Primary, 20);
-			SetAmmo(this.index, TFWeaponSlot_Secondary, 200); /// Bug fix, Merc spawns with 32 ammo on secondary
-		}
+		SetVariantString(Merc_Model);
+		AcceptEntityInput(this.index, "SetCustomModel");
+		SetEntProp(this.index, Prop_Send, "m_bUseClassAnimations", 1);
+		this.SpawnWeapon("tf_weapon_scattergun", 1153, 1, 0, "2030 ; 1 ; 808 ; 0 ; 1 ; 1 ; 6 ; 0.75 ; 106 ; 0.75 ; 547 ; 1");
+		this.SpawnWeapon("tf_weapon_smg", 1098, 1, 0, "306 ; 0 ; 647 ; 0 ; 392 ; 0.5 ; 4 ; 1.2 ; 2 ; 1.5 ; 106 ; 0.5 ; 96 ; 3.0 ; 144 ; 1 ; 51 ; 0 ; 78 ; 6.25");
+		this.SpawnWeapon("tf_weapon_shovel", 30758, 1, 0, "2030 ; 1 ; 149 ; 3 ; 851 ; 1.15 ; 1 ; 0.9 ; 851 ; 1,4375‬");
+		this.SpawnWeapon("tf_weapon_grapplinghook", 1152, 1, 0, "547 ; 1 ; 199 ; 1 ; 289 ; 1");
+		//this.SpawnWeapon(merc.index, "tf_weapon_spellbook", 1132, 1, 0, "547 ; 0 ; 199 ; 0 ; 289 ; 1 ; 643 ; 0.125 ; 280 ; 2");
+		SetAmmo(this.index, TFWeaponSlot_Primary, 20);
+		SetAmmo(this.index, TFWeaponSlot_Secondary, 200); /// Bug fix, Merc spawns with 32 ammo on secondary
 	}
 	public void OnDeath(BTCBaseClass attacker, Event event)
 	{
@@ -237,7 +230,7 @@ public CMercenary ToCMercenary(const BTCBaseClass guy)
 int g_iMercID;
 
 public void OnLibraryAdded(const char[] name) {
-	if( StrEqual(name, "BTC") ) {
+	if( StrEqual(name, "BeTheClass") ) {
 		g_iMercID = BTC_RegisterPlugin("mercenary");
 		LoadBTCHooks();
 	}
@@ -292,10 +285,12 @@ public void Mercenary_OnClassThink(const BTCBaseClass player) {
 	ToCMercenary(player).Think();
 }
 
-public void Mercenary_OnClassSpawn(const BTCBaseClass player, Event event) {
-	if(!IsMercenary(player))
-		return;
+public void MercSpawn(BTCBaseClass player) {
 	ToCMercenary(player).OnSpawn();
+}
+
+public void Mercenary_OnClassSpawn(const BTCBaseClass player, Event event) {
+	SetPawnTimer(MercSpawn, 0.2, player);
 }
 
 public void Mercenary_OnClassDeath(const BTCBaseClass attacker, const BTCBaseClass victim, Event event) {

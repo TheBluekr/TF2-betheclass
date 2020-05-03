@@ -27,7 +27,7 @@ methodmap BTCBaseClass {
 	public native bool SetPropFloat(const char prop_name[64], float value);
 	public native bool SetPropAny(const char prop_name[64], any value);
 
-	public native void RemoveAllItems();
+	public native void RemoveAllItems(bool weps=true);
 	public native int SpawnWeapon(char[] name, const int index, const int level, const int qual, char[] att);
 
 	property int iPresetType {

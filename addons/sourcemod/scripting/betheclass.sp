@@ -153,14 +153,13 @@ public void OnPluginStart() {
 	HookEvent("player_spawn", OnSpawn);
 	HookEvent("player_death", OnPlayerDeath, EventHookMode_Pre);
 	HookEvent("player_hurt", OnPlayerHurt, EventHookMode_Pre);
-	HookEvent("post_inventory_application", OnResupply);
 
 	g_btc.m_hForwards[OnCallDownload] = new PrivateForward(ET_Event);
 	g_btc.m_hForwards[OnClassThink] = new PrivateForward(ET_Event, Param_Cell);
 	g_btc.m_hForwards[OnClassSpawn] = new PrivateForward(ET_Event, Param_Cell, Param_Cell);
 	g_btc.m_hForwards[OnClassDeath] = new PrivateForward(ET_Event, Param_Cell, Param_Cell, Param_Cell);
 	g_btc.m_hForwards[OnClassHurt] = new PrivateForward(ET_Event, Param_Cell, Param_Cell, Param_Cell);
-	g_btc.m_hForwards[OnClassResupply] = new PrivateForward(ET_Event, Param_Cell);
+	g_btc.m_hForwards[OnClassResupply] = new PrivateForward(ET_Event, Param_Cell, Param_Cell);
 	g_btc.m_hForwards[OnClassMenu] = new PrivateForward(ET_Event, Param_CellByRef);
 
 	g_btc.m_hPlayerFields[0] = new StringMap();
@@ -229,8 +228,10 @@ public Action OnPlayerHurt(Event event, const char[] name, bool dontBroadcast) {
 }
 
 public Action OnResupply(Event event, const char[] name, bool dontBroadcast) {
+	if(GameRules_GetRoundState() < RoundState_Pregame)
+		return Plugin_Continue;
 	BaseClass player = BaseClass(event.GetInt("userid"), true);
-	if( player && IsClientInGame(player.index) ) {
+	if(player && IsValidClient(player.index)) {
 		SetVariantString(""); AcceptEntityInput(player.index, "SetCustomModel");
 		player.SetOverlay("0");
 
@@ -241,7 +242,7 @@ public Action OnResupply(Event event, const char[] name, bool dontBroadcast) {
 		Call_Finish(act);
 
 		if(act > Plugin_Changed)
-			return Plugin_Continue;
+			return act;
 
 		TF2Attrib_RemoveAll(player.index);
 		TF2_RegeneratePlayer(player.index);
@@ -251,6 +252,7 @@ public Action OnResupply(Event event, const char[] name, bool dontBroadcast) {
 }
 
 public void OnClientPutInServer(int client) {
+	g_btc.m_hPlayerFields[client] = new StringMap();
 	g_btc.m_hPlayerFields[client].SetValue("iPresetType", 0);
 }
 
@@ -293,7 +295,7 @@ public Action CommandCreateClassMenu(int iClient, int args) {
 	return Plugin_Handled;
 }
 
-public Action CreateClassMenu(int iClient) {
+public void CreateClassMenu(int iClient) {
 	Menu classMenu = new Menu(MenuHandler_PickClass);
 	classMenu.SetTitle("Class selection menu: ");
 	// More flexible menu selection values
@@ -308,7 +310,6 @@ public Action CreateClassMenu(int iClient) {
 	Call_Finish();
 
 	classMenu.Display(iClient, 30);
-	return Plugin_Handled;
 }
 
 public int MenuHandler_PickClass(Menu menu, MenuAction action, int param1, int param2) {
@@ -383,7 +384,7 @@ public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max
 	CreateNative("BTCBaseClass.SpawnWeapon", Native_BTC_SpawnWep);
 	CreateNative("BTCBaseClass.RemoveAllItems", Native_BTC_RemoveAllItems);
 
-	RegPluginLibrary("BTC");
+	RegPluginLibrary("BeTheClass");
 	return APLRes_Success;
 }
 
