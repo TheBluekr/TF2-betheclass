@@ -1,110 +1,39 @@
-/*
-Attempt at creating a custom class hub -Blue
-*/
-
 #include <sourcemod>
-#include <sdktools>
-#include <sdkhooks>
-#include <tf2>
-#include <tf2_stocks>
-#include <tf2attributes>
-#include <tf2items>
 #include <betheclass>
-#undef REQUIRE_PLUGIN
-#tryinclude <vsh2>
-#tryinclude <freak_fortress_2>
-#define REQUIRE_PLUGIN
+#include <tf2items>
+#include <clientprefs>
+#include <vsh2>
 
-#define int(%1)	view_as<int>(%1)
-
-#define PLUGIN_VERSION "1.0.5"
-
-// Python style declarations
-#define or ||
-#define and &&
-
-#define Scout_Model					"models/player/scout.mdl"
-#define Soldier_Model				"models/player/soldier.mdl"
-#define Pyro_Model					"models/player/pyro.mdl"
-#define Demo_Model					"models/player/demo.mdl"
-#define Heavy_Model					"models/player/heavy.mdl"
-#define Engineer_Model				"models/player/engineer.mdl"
-#define Medic_Model					"models/player/medic.mdl"
-#define Sniper_Model				"models/player/sniper.mdl"
-#define Spy_Model					"models/player/spy.mdl"
+#define PLYR           35
+#define PLUGIN_VERSION "0.0.1"
 
 public Plugin myinfo =
 {
-	name = "Be the class hub",
-	author = "TheBluekr", // Add any names for who contribute
+	name = "VSH2 Be The Class Hub addon",
+	author = "TheBluekr",
 	description = "Set the player's class to any of the custom classes!",
 	version = PLUGIN_VERSION,
-	url = "https://steamcommunity.com/groups/VersusPonyvilleReborn"
-}
-
-enum /* CvarName */ {
-	WizardLimit,
-	WizardMana,
-	WizardManaRegen,
-	WizardManaOnHit,
-	WizardFireCost,
-	WizardFireCooldown,
-	WizardFireCharges,
-	WizardBatsCost,
-	WizardBatsCooldown,
-	WizardBatsCharges,
-	WizardUberCost,
-	WizardUberCooldown,
-	WizardUberCharges,
-	WizardJumpCost,
-	WizardJumpCooldown,
-	WizardJumpCharges,
-	WizardInvisCost,
-	WizardInvisCooldown,
-	WizardInvisCharges,
-	WizardInvisBonus,
-	WizardMeteorCost,
-	WizardMeteorCooldown,
-	WizardMeteorCharges,
-	WizardMonoCost,
-	WizardMonoCooldown,
-	WizardMonoCharges,
-	MercenaryLimit,
-	MercenaryGrenade,
-	MercenaryGrenadeRegen,
-	VersionNumber
+	url = "https://git.thebluekr.nl/vspr/be-the-class"
 };
 
-enum /* Forwards */ {
-	OnSpawn,
-	OnDamageDealt,
-	OnDamageTaken,
-	OnWizardCast,
-	OnMercenaryGrenadeThrow
+enum {
+	ClassPreset,
+	MaxBTCCookies
+};
+
+enum struct ClassModule {
+	char name[MAX_CLASS_NAME_SIZE];
+	Handle plugin;
 }
 
-bool g_vsh2 = false;
+enum struct BTCGlobals {
+	ArrayList m_hClassesRegistered;
+	Cookie m_hCookies[MaxBTCCookies];
+	PrivateForward m_hForwards[MaxBTCForwards];
+	StringMap m_hPlayerFields[PLYR];
+}
 
-ConVar bEnabled = null;
-ConVar cvarBTC[VersionNumber+1]; // Don't touch, add cvars in enum above
-
-Handle forwardBTC[OnMercenaryGrenadeThrow];
-
-// Define handles
-Handle
-	SpellHUD,
-	CoolHUD,
-	GrenadeHUD,
-	StatusHUD,
-	g_hSDKPlaySpecificSequence,
-	g_hSDKGetMaxAmmo
-;
-
-// If you add any custom classes, update the .inc
-
-BTCClass MaxClass = Mercenary; // Update this when new classes get added
-
-StringMap hPlayerFields[MAXPLAYERS+1];
+BTCGlobals g_btc;
 
 methodmap BaseClass
 {
@@ -113,596 +42,168 @@ methodmap BaseClass
 		int player=0;	// If you're using a userid and you know 100% it's valid, then set uid to true
 		if( uid && GetClientOfUserId(ind) > 0 )
 			player = (ind);
-		else if( IsClientHere(ind) )
+		else if( IsValidClient(ind) )
 			player = GetClientUserId(ind);
 		return view_as< BaseClass >( player );
 	}
 
-	// Properties
 	property int userid {
-		public get()
-		{
-			return view_as< int >(this);
-		}
+		public get() { return view_as< int >(this); }
 	}
 	property int index {
-		public get()
-		{
-			return GetClientOfUserId( view_as< int >(this) );
-		}
+		public get() { return GetClientOfUserId( view_as< int >(this) ); }
 	}
-	property BTCClass iPresetType {
+
+	property int iPresetType {
 		public get()
 		{
 			if(!this.index)
-				return None;
-			BTCClass i; hPlayerFields[this.index].GetValue("iPresetType", i);
+				return -1;
+			int i; g_btc.m_hPlayerFields[this.index].GetValue("iPresetType", i);
 			return i;
 		}
-		public set(const BTCClass val)
+		public set(const int val)
 		{
 			int player = this.index;
 			if( !player )
 				return;
-			hPlayerFields[player].SetValue("iPresetType", val);
+			g_btc.m_hPlayerFields[player].SetValue("iPresetType", val);
 		}
 	}
-	property BTCClass iClassType {
+	property int iClassType {
 		public get()
 		{
 			if(!this.index)
-				return None;
-			BTCClass i; hPlayerFields[this.index].GetValue("iClassType", i);
+				return -1;
+			int i; g_btc.m_hPlayerFields[this.index].GetValue("iClassType", i);
 			return i;
 		}
-		public set(const BTCClass val)
+		public set(const int val)
 		{
 			int player = this.index;
 			if( !player )
 				return;
-			hPlayerFields[player].SetValue("iClassType", val);
+			g_btc.m_hPlayerFields[player].SetValue("iClassType", val);
 		}
 	}
-	property TFTeam Team {
-		public get()
-		{
-			return TF2_GetClientTeam(this.index);
-		}
-	}
-	property int iTeam {
-		public get()
-		{
-			return view_as<int>(TF2_GetClientTeam(this.index));
-		}
-	}
-	public bool IsReady()
+
+	public int SpawnWeapon(char[] name, const int index, const int level, const int qual, char[] att)
 	{
-		if(TF2_IsPlayerInCondition(this.index, TFCond_Cloaked) || TF2_IsPlayerInCondition(this.index, TFCond_Dazed) || TF2_IsPlayerInCondition(this.index, TFCond_Taunting) || TF2_IsPlayerInCondition(this.index, TFCond_Bonked) || TF2_IsPlayerInCondition(this.index, TFCond_RestrictToMelee) || TF2_IsPlayerInCondition(this.index, TFCond_MeleeOnly) || TF2_IsPlayerInCondition(this.index, TFCond_HalloweenGhostMode) || TF2_IsPlayerInCondition(this.index, TFCond_HalloweenKart))
-			return false;
-		return true;
+		TF2Item hWep = new TF2Item(OVERRIDE_ALL|FORCE_GENERATION);
+		if( !hWep )
+			return -1;
+		
+		hWep.SetClassname(name);
+		hWep.iItemIndex = index;
+		hWep.iLevel = level;
+		hWep.iQuality = qual;
+		char atts[32][32];
+		int count = ExplodeString(att, "; ", atts, 32, 32);
+		
+		/// odd numbered attributes result in an error, remove the 1st bit so count will always be even.
+		count &= ~1;
+		if( count > 0 ) {
+			hWep.iNumAttribs = count / 2;
+			int i2=0;
+			for( int i=0; i<count; i+=2 ) {
+				hWep.SetAttribute( i2, StringToInt(atts[i]), StringToFloat(atts[i+1]) );
+				i2++;
+			}
+		}
+		else hWep.iNumAttribs = 0;
+		
+		int entity = hWep.GiveNamedItem(this.index);
+		delete hWep;
+		EquipPlayerWeapon(this.index, entity);
+		return entity;
 	}
-	public void RemoveAllItems()
-	{
-		TF2_RemovePlayerDisguise(this.index);
+
+	public void RemoveAllItems(bool weps = true) {
+		int client = this.index;
+		TF2_RemovePlayerDisguise(client);
 		
 		int ent = -1;
 		while( (ent = FindEntityByClassname(ent, "tf_wearabl*")) != -1 ) {
-			if( GetOwner(ent) == this.index ) {
-				TF2_RemoveWearable(this.index, ent);
+			if( GetOwner(ent) == client ) {
+				TF2_RemoveWearable(client, ent);
 				AcceptEntityInput(ent, "Kill");
 			}
 		}
 		ent = -1;
 		while( (ent = FindEntityByClassname(ent, "tf_powerup_bottle")) != -1 ) {
-			if( GetOwner(ent) == this.index ) {
-				TF2_RemoveWearable(this.index, ent);
+			if( GetOwner(ent) == client ) {
+				TF2_RemoveWearable(client, ent);
 				AcceptEntityInput(ent, "Kill");
 			}
 		}
-		TF2_RemoveAllWeapons(this.index);
-	}
-	public void UpdateHUD(int client, Handle hHUD, const char[] text, float x, float y, float holdTime, int r, int g, int b, int a, int effect, float fxTime, float fadeIn, float fadeOut)
-	{
-		SetHudTextParams(x, y, holdTime, r, g, b, a, effect, fxTime, fadeIn, fadeOut);
-		ShowSyncHudText(client, hHUD, text);
+		if( weps )
+			TF2_RemoveAllWeapons(client);
 	}
 }
 
-// Add any external files here
-#include "subclass/stocks.inc" // Always load this first
-#include "subclass/wizard.sp"
-#include "subclass/mercenary.sp"
-#include "subclass/natives.sp"
+public void OnPluginStart() {
+	g_btc.m_hForwards[OnCallDownload] = new PrivateForward( ET_Event );
+	g_btc.m_hForwards[OnPlayerThink] = new PrivateForward( ET_Event, Param_Cell );
+
+	g_btc.m_hPlayerFields[0] = new StringMap();
+	g_btc.m_hClassesRegistered = new ArrayList(sizeof(ClassModule));
+}
 
 public void OnLibraryAdded(const char[] name) {
 	if( StrEqual(name, "VSH2") ) {
-		g_vsh2 = true;
-	}
-}
-
-public void OnLibraryRemoved(const char[] name) {
-	if( StrEqual(name, "VSH2") ) {
-		g_vsh2 = false;
-	}
-}
-
-public void OnPluginStart()
-{
-	RegConsoleCmd("sm_class", CommandCreateClassMenu, "Usage: sm_class");
-	RegAdminCmd("sm_forceclass", CommandForceClass, ADMFLAG_GENERIC, "Usage: sm_forceclass @target index");
-	HookEvent("player_spawn", OnPlayerSpawn);
-	HookEvent("player_death", OnPlayerDeath, EventHookMode_Pre);
-	HookEvent("player_hurt", OnPlayerHurt, EventHookMode_Pre);
-	HookEvent("player_changeclass", OnChangeClass);
-	HookEvent("teamplay_round_start", OnRoundStart);
-	HookEvent("teamplay_round_win", OnRoundEnd);
-	HookEvent("item_pickup", OnItemPickUp, EventHookMode_Pre);
-	AddCommandListener(OnJoinClass, "joinclass");
-	AddCommandListener(OnJoinClass, "join_class");
-	AddCommandListener(OnVoiceMenu, "voicemenu");
-	//AddCommandListener(OnReload, "+reload");
-	AddNormalSoundHook(HookSound);
-	// Version ConVar
-	bEnabled = CreateConVar("btc_enabled", "1", "Enable/disable BeTheClass plugin", FCVAR_NOTIFY, true, 0.0, true, 1.0);
-	cvarBTC[VersionNumber] = CreateConVar("btc_version_number", PLUGIN_VERSION, "BeTheClass Plugin Version Number. (DO NOT TOUCH)", FCVAR_NOTIFY|FCVAR_DONTRECORD|FCVAR_CHEAT);
-
-	// Wizard cvars
-	cvarBTC[WizardLimit] = CreateConVar("btc_wizard_limit", "2", "Limit for amount of wizards", FCVAR_NOTIFY, true, 0.0, false, 0.0);
-	cvarBTC[WizardMana] = CreateConVar("btc_wizard_mana", "100.0", "Limit for total wizard mana pool", FCVAR_NOTIFY, true, 0.0, false, 0.0);
-	cvarBTC[WizardManaRegen] = CreateConVar("btc_wizard_mana_regen", "1.0", "Mana regen rate per second", FCVAR_NOTIFY, true, 0.0, false, 0.0);
-	cvarBTC[WizardManaOnHit] = CreateConVar("btc_wizard_mana_onhit", "10.0", "Bonus mana awarded on melee hit", FCVAR_NOTIFY, true, 0.0, false, 0.0);
-	cvarBTC[WizardFireCost] = CreateConVar("btc_wizard_fire_cost", "20.0", "Mana cost for fire spell", FCVAR_NOTIFY, true, 0.0, false, 0.0);
-	cvarBTC[WizardFireCooldown] = CreateConVar("btc_wizard_fire_cooldown", "4.5", "Cooldown for fire spell", FCVAR_NOTIFY, true, 0.0, false, 0.0);
-	cvarBTC[WizardFireCharges] = CreateConVar("btc_wizard_fire_charges", "2", "Charges for fire spell", FCVAR_NOTIFY, true, 0.0, false, 0.0);
-	cvarBTC[WizardBatsCost] = CreateConVar("btc_wizard_bats_cost", "25.0", "Mana cost for bats spell", FCVAR_NOTIFY, true, 0.0, false, 0.0);
-	cvarBTC[WizardBatsCooldown] = CreateConVar("btc_wizard_bats_cooldown", "4.5", "Cooldown for bats spell", FCVAR_NOTIFY, true, 0.0, false, 0.0);
-	cvarBTC[WizardBatsCharges] = CreateConVar("btc_wizard_bats_charges", "1", "Charges for bats spell", FCVAR_NOTIFY, true, 0.0, false, 0.0);
-	cvarBTC[WizardUberCost] = CreateConVar("btc_wizard_uber_cost", "60.0", "Mana cost for uber spell", FCVAR_NOTIFY, true, 0.0, false, 0.0);
-	cvarBTC[WizardUberCooldown] = CreateConVar("btc_wizard_uber_cooldown", "60.0", "Cooldown for uber spell", FCVAR_NOTIFY, true, 0.0, false, 0.0);
-	cvarBTC[WizardUberCharges] = CreateConVar("btc_wizard_uber_charges", "1", "Charges for uber spell", FCVAR_NOTIFY, true, 0.0, false, 0.0);
-	cvarBTC[WizardJumpCost] = CreateConVar("btc_wizard_jump_cost", "35.0", "Mana cost for uber spell", FCVAR_NOTIFY, true, 0.0, false, 0.0);
-	cvarBTC[WizardJumpCooldown] = CreateConVar("btc_wizard_jump_cooldown", "6.0", "Cooldown for jump spell", FCVAR_NOTIFY, true, 0.0, false, 0.0);
-	cvarBTC[WizardJumpCharges] = CreateConVar("btc_wizard_jump_charges", "2", "Charges for jump spell", FCVAR_NOTIFY, true, 0.0, false, 0.0);
-	cvarBTC[WizardInvisCost] = CreateConVar("btc_wizard_invis_cost", "20.0", "Mana cost for invis spell", FCVAR_NOTIFY, true, 0.0, false, 0.0);
-	cvarBTC[WizardInvisCooldown] = CreateConVar("btc_wizard_invis_cooldown", "20.0", "Cooldown for invis spell", FCVAR_NOTIFY, true, 0.0, false, 0.0);
-	cvarBTC[WizardInvisCharges] = CreateConVar("btc_wizard_invis_charges", "1", "Charges for invis spell", FCVAR_NOTIFY, true, 0.0, false, 0.0);
-	cvarBTC[WizardInvisBonus] = CreateConVar("btc_wizard_invis_bonus", "15.0", "Bonus awarded on melee hit while invisible (can be negative)", FCVAR_NOTIFY, false, 0.0, false, 0.0);
-	cvarBTC[WizardMeteorCost] = CreateConVar("btc_wizard_meteor_cost", "90.0", "Mana cost for meteor spell", FCVAR_NOTIFY, true, 0.0, false, 0.0);
-	cvarBTC[WizardMeteorCooldown] = CreateConVar("btc_wizard_meteor_cooldown", "40.0", "Cooldown for meteor spell", FCVAR_NOTIFY, true, 0.0, false, 0.0);
-	cvarBTC[WizardMeteorCharges] = CreateConVar("btc_wizard_meteor_charges", "1", "Charges for meteor spell", FCVAR_NOTIFY, true, 0.0, false, 0.0);
-	cvarBTC[WizardMonoCost] = CreateConVar("btc_wizard_mono_cost", "75.0", "Mana cost for monoculus spell", FCVAR_NOTIFY, true, 0.0, false, 0.0);
-	cvarBTC[WizardMonoCooldown] = CreateConVar("btc_wizard_mono_cooldown", "40.0", "Cooldown for monoculus spell", FCVAR_NOTIFY, true, 0.0, false, 0.0);
-	cvarBTC[WizardMonoCharges] = CreateConVar("btc_wizard_mono_charges", "1", "Charges for monoculus spell", FCVAR_NOTIFY, true, 0.0, false, 0.0);
-
-	// Mercenary cvars
-	cvarBTC[MercenaryLimit] = CreateConVar("btc_mercenary_limit", "3", "Limit for amount of mercenaries", FCVAR_NOTIFY, true, 0.0, false, 0.0);
-	cvarBTC[MercenaryGrenade] = CreateConVar("btc_mercenary_grenade", "2", "Grenade stock limit for mercenaries", FCVAR_NOTIFY, true, 0.0, false, 0.0);
-	cvarBTC[MercenaryGrenadeRegen] = CreateConVar("btc_mercenary_grenade_regen", "60.0", "Regen interval for grenades for mercenaries", FCVAR_NOTIFY, true, 0.0, false, 0.0);
-
-	// Forwards
-	forwardBTC[OnSpawn] = CreateGlobalForward("BTC_OnSpawn", ET_Event, Param_Cell, Param_CellByRef);
-	//forwardBTC[OnDamageDealt] = CreateGlobalForward("BTC_OnDamage", ET_Event, Param_Cell, Param_Cell, Param_Cell);
-
-	// Create HUD synchronizer
-	SpellHUD = CreateHudSynchronizer();
-	CoolHUD = CreateHudSynchronizer();
-	GrenadeHUD = CreateHudSynchronizer();
-	StatusHUD = CreateHudSynchronizer();
-
-	for( int i=MaxClients ; i ; --i ) { // In case we load late
-		if( !IsValidClient(i) )
-			continue;
-		OnClientPutInServer(i);
-	}
-
-	hPlayerFields[0] = new StringMap();
-
-	AddWizardToDownloads();
-	AddMercenaryToDownload();
-}
-
-public void OnAllPluginsLoaded()
-{
-	// Taking the SDK calls from STT, thanks for linking me this Ivory -Blue
-	Handle hGamedata = LoadGameConfigFile("betheclass");
-	if(hGamedata == INVALID_HANDLE)
-	{
-		LogMessage("Failed to load gamedata: betheclass.txt!");
-		return;
-	}
-
-	StartPrepSDKCall(SDKCall_Player);
-	PrepSDKCall_SetFromConf(hGamedata, SDKConf_Signature, "CTFPlayer::GetMaxAmmo");
-	PrepSDKCall_AddParameter(SDKType_PlainOldData, SDKPass_Plain);
-	PrepSDKCall_AddParameter(SDKType_PlainOldData, SDKPass_Plain);
-	PrepSDKCall_SetReturnInfo(SDKType_PlainOldData, SDKPass_Plain);
-	g_hSDKGetMaxAmmo = EndPrepSDKCall();
-	if(g_hSDKGetMaxAmmo == INVALID_HANDLE)
-	{
-		LogMessage("Failed to create call: CTFPlayer::GetMaxAmmo!");
-	}
-
-	StartPrepSDKCall(SDKCall_Player);
-	PrepSDKCall_SetFromConf(hGamedata, SDKConf_Signature, "CTFPlayer::PlaySpecificSequence");
-	PrepSDKCall_AddParameter(SDKType_String, SDKPass_Pointer);
-	g_hSDKPlaySpecificSequence = EndPrepSDKCall();
-	if(g_hSDKPlaySpecificSequence == INVALID_HANDLE)
-	{
-		LogMessage("Failed to create call: CTFPlayer::PlaySpecificSequence!");
+		RegConsoleCmd("sm_class", CommandCreateClassMenu, "Usage: sm_class");
+		//RegAdminCmd("sm_forceclass", CommandForceClass, ADMFLAG_GENERIC, "Usage: sm_forceclass @target index");
 	}
 }
 
 public void OnClientPutInServer(int client)
 {
-	if(!IsValidClient(client))
-		return;
-
-	if( hPlayerFields[client] != null )
-		delete hPlayerFields[client];
-
-	hPlayerFields[client] = new StringMap();
 	BaseClass baseplayer = BaseClass(client);
-	// If any attributes are added, initialize them here before using them
-	baseplayer.iPresetType = None;
-	baseplayer.iClassType = None;
-
-	// If any new custom classes are added, make sure to call an Init()
-	ToCWizard(baseplayer).Init();
-	ToCMercenary(baseplayer).Init();
-
-	// Pickup block for wizard
-	/*SDKHook(client, SDKHook_StartTouch, OnPickup);
-	SDKHook(client, SDKHook_Touch, OnPickup);*/
+	baseplayer.iPresetType = 0;
 }
 
 public void OnClientDisconnect(int client)
 {
-	if(!IsValidClient(client))
-		return;
-	
 	BaseClass baseplayer = BaseClass(client);
-	hPlayerFields[client].SetValue("iPresetType", None);
-	baseplayer.iClassType = None;
-	// Just to prevent limit from glitching out
+	baseplayer.iPresetType = 0;
+	baseplayer.iClassType = 0;
+	/// Just to prevent limit from glitching out
 }
 
 public void OnMapStart()
 {
-	PrecacheSound(SOUND_RECHARGE, true);
-#if defined _vsh2_included
-	if(g_vsh2)
-		VSH2_Hook(OnRedPlayerThink, VSH2_BaseThink);
-	else
-		CreateTimer(0.1, BaseThink, _, TIMER_REPEAT|TIMER_FLAG_NO_MAPCHANGE);
-#endif
-#if !defined _vsh2_included
-	CreateTimer(0.1, BaseThink, _, TIMER_REPEAT|TIMER_FLAG_NO_MAPCHANGE);
-#endif
+	Action act;
+	Call_StartForward(g_btc.m_hForwards[OnCallDownloads]);
+	Call_Finish(act);
+	
+	CreateTimer(0.1, Timer_PlayerThink, _, TIMER_REPEAT|TIMER_FLAG_NO_MAPCHANGE);
 }
 
-public void OnRoundStart(Event event, const char[] name, bool dontBroadcast)
+public Action Timer_PlayerThink(Handle hTimer)
 {
-	if(!bEnabled.BoolValue)
-		return;
-	BaseClass baseplayer = BaseClass(GetEventInt(event,"userid"), true);
-	if(!IsValidClient(baseplayer.index)) {
-		return;
-	}
-	float mercpos[3];
-	GetClientAbsOrigin(baseplayer.index, mercpos);
-	char medSound[35];
-	switch(baseplayer.iClassType) {
-		case None: {}
-		case Wizard: {
-			Format(medSound, sizeof(medSound), "vo/merasmus/round_begin0%i.mp3", GetRandomInt(1, 4));
-			EmitSoundToAll(medSound, baseplayer.index, _, _, _, 0.5, _, _, mercpos, _, false);
-		}
-	}
-}
-
-public void OnRoundEnd(Event event, const char[] name, bool dontBroadcast)
-{
-}
-
-public Action OnPlayerSpawn(Event event, const char[] name, bool dontBroadcast)
-{
-	if(!bEnabled.BoolValue)
+	// if(VSH2GameMode_GetPropInt("iRoundState") == StateRunning
+	if(GameRules_GetRoundState() != RoundState_RoundRunning)
 		return Plugin_Continue;
 	
-	BaseClass baseplayer = BaseClass(GetEventInt(event,"userid"), true);
-
-	if(!IsValidClient(baseplayer.index)) {
-		return Plugin_Continue;
-	}
-
-	baseplayer.iClassType = None;
-	
-#if defined _FF2_included
-	if(FF2_GetBossIndex(baseplayer.index) != -1) // Check if our user isn't a boss
-		return Plugin_Continue;
-	
-	// Future warning, might remove this due to the forward handling this
-	if(FF2_GetRoundState() == 1) // Flipping logic around, don't set custom classes during round due to minions and class scrambling. Call BTCBase.Convert() instead mid-round.
-		return Plugin_Continue;
-#endif
-
-#if defined _vsh2_included
-	if(VSH2Player(baseplayer.index).GetPropInt("iBossType") > -1)
-		return Plugin_Continue;
-	
-	// See FF2 note above
-	if(VSH2GameMode_GetProperty("iRoundState") == StateRunning)
-		return Plugin_Continue;
-#endif
-	
-	BTCClass iPreset = baseplayer.iPresetType;
-
-	Action action = Plugin_Continue;
-	Call_StartForward(forwardBTC[OnSpawn]);
-	Call_PushCell(baseplayer.index);
-	Call_PushCellRef(view_as<int>(iPreset));
-	Call_Finish(action);
-
-	if(action > Plugin_Continue) {
-		return Plugin_Continue;
-	}
-
-	TF2Attrib_RemoveAll(baseplayer.index);
-	
-	switch(baseplayer.iPresetType) {
-		case None: {
-			baseplayer.iClassType = None;
-			SetVariantString("");
-			AcceptEntityInput(baseplayer.index, "SetCustomModel");
-		}
-		case Wizard: {
-			if( CalcLimit(Wizard) < cvarBTC[WizardLimit].IntValue ) {
-				baseplayer.iClassType = Wizard;
-				ToCWizard(baseplayer).OnSpawn();
-			}
-		}
-		case Mercenary: {
-			if( CalcLimit(Mercenary) < cvarBTC[MercenaryLimit].IntValue ) {
-				baseplayer.iClassType = Mercenary;
-				ToCMercenary(baseplayer).OnSpawn();
-			}
-		}
-		default: { // In case we're going out of index
-			baseplayer.iPresetType = None;
-			baseplayer.iClassType = None;
-			SetVariantString("");
-			AcceptEntityInput(baseplayer.index, "SetCustomModel");
-		}
-	}
-	return Plugin_Continue;
-}
-
-public Action OnPlayerDeath(Event event, const char[] eventName, bool dontBroadcast)
-{
-	if(!bEnabled.BoolValue)
-		return Plugin_Continue;
-	BaseClass victim = BaseClass(GetEventInt(event, "userid"), true);
-	BaseClass attacker = BaseClass(GetEventInt(event, "attacker"), true);
-	TF2Attrib_RemoveAll(victim.index); // For safety
-	switch(victim.iClassType) {
-		case None:		{}
-		case Wizard:	ToCWizard(victim).OnDeath(attacker, victim, event);
-		case Mercenary:	ToCMercenary(victim).OnDeath(attacker, victim, event);
-	}
-	switch(attacker.iClassType) { // For changing event values
-		case None:		{}
-		case Wizard:	ToCWizard(attacker).OnKill(attacker, victim, event);
-		case Mercenary:	ToCMercenary(victim).OnKill(attacker, victim, event);
-	}
-	return Plugin_Continue;
-}
-
-public Action OnPlayerHurt(Event event, const char[] name, bool dontBroadcast)
-{
-	if(!bEnabled.BoolValue)
-		return Plugin_Continue;
-	BaseClass victim = BaseClass(event.GetInt("userid"), true);
-	BaseClass attacker = BaseClass(event.GetInt("attacker"), true);
-	if(IsValidClient(victim.index)) { // Fix bots playing Wizard sounds
-		switch(victim.iClassType) {
-			case None:	{}
-			case Wizard: {
-				ToCWizard(victim).OnHurt(attacker, victim, event);
-			}
-		}
-	}
-	if(IsValidClient(attacker.index)) {
-		switch(attacker.iClassType) {
-			case None:		{}
-			case Wizard:	{
-				ToCWizard(attacker).OnDamage(attacker, victim, event);
-			}
-		}
-	}
-	return Plugin_Continue;
-}
-
-public Action OnChangeClass(Event event, const char[] eventName, bool dontBroadcast)
-{
-	if(!bEnabled.BoolValue)
-		return Plugin_Continue;
-	int client = GetClientOfUserId(GetEventInt(event, "userid"));
-	BaseClass baseplayer = BaseClass(client);
-	if(baseplayer.iPresetType > None) {
-		baseplayer.iPresetType = None;
-		PrintToChat(baseplayer.index, "\x01\x070066BB[BeTheClass]\x01 Reset selection due to class change.");
-	}
-	return Plugin_Continue;
-}
-
-public Action OnJoinClass(int client, const char[] command, int argc)
-{
-	if(!bEnabled.BoolValue)
-		return Plugin_Continue;
-	char str_tfclass[20];
-	GetCmdArg(1, str_tfclass, sizeof(str_tfclass));
-	TFClassType classtype = TF2_GetClass(str_tfclass);
-	SetEntProp(client, Prop_Send, "m_iDesiredPlayerClass", view_as<int>(classtype));
-	BaseClass baseplayer = BaseClass(client);
-	if(baseplayer.iPresetType > None) {
-		baseplayer.iPresetType = None;
-		PrintToChat(baseplayer.index, "\x01\x070066BB[BeTheClass]\x01 Reset selection due to class change.");
-	}
-	return Plugin_Continue;
-}
-
-public Action OnItemPickUp(Event event, const char[] eventName, bool dontBroadcast)
-{
-	if(!bEnabled.BoolValue)
-		return Plugin_Continue;
-	BaseClass baseplayer = BaseClass(GetEventInt(event, "userid"), true);
-	char item[64];
-	GetEventString(event, "item", item, sizeof(item));
-	switch(baseplayer.iClassType) {
-		case None:		{}
-		case Mercenary:	ToCMercenary(baseplayer).OnItemPickUp(baseplayer, item, event);
-	}
-	return Plugin_Continue;
-}
-
-public Action BaseThink(Handle hTimer)
-{
-	if(!bEnabled.BoolValue)
-		return Plugin_Continue;
-
-	BaseClass baseplayer;
-	for( int i=MaxClients ; i > 0 ; i-- ) { // Begin iterating over all players every 0.1s, less memory intense than calling up to 24-32 timers
-		if( !IsValidClient(i) )
+	BaseClass player;
+	for(int i=MaxClients; i; --i) {
+		if(!IsValidClient(i, false))
 			continue;
+		
+		player = BaseClass(i);
 
-		baseplayer = BaseClass(i);
-		switch(baseplayer.iClassType) {
-			case None:		{}
-			case Wizard:	ToCWizard(baseplayer).Think();
-			case Mercenary:	ToCMercenary(baseplayer).Think();
-		}
+		Action act;
+		Call_StartForward(g_btc.m_hForwards[OnPlayerThink]);
+		Call_PushCell(player);
+		Call_Finish(act);
 	}
-	return Plugin_Continue;
-}
-
-#if defined _vsh2_included
-public Action VSH2_BaseThink(const VSH2Player player)
-{
-	if(!g_vsh2)
-		return Plugin_Continue;
 	
-	if(!bEnabled.BoolValue)
-		return Plugin_Continue;
-	
-	baseplayer = BaseClass(player.index)
-	switch(baseplayer.iClassType) {
-		case None:		{}
-		case Wizard:	ToCWizard(baseplayer).Think();
-		case Mercenary:	ToCMercenary(baseplayer).Think();
-	}
-}
-#endif
-
-public int CalcLimit(BTCClass iClass)
-{
-	int total;
-	for( int i=MaxClients ; i > 0 ; i-- ) {
-		if(BaseClass(i).iClassType == iClass && IsValidClient(i))
-			total++;
-	}
-	return total;
-}
-
-// TF2 event handling
-public void TF2_OnConditionAdded(int iClient, TFCond condition)
-{
-	if(!bEnabled.BoolValue)
-		return;
-	BaseClass baseplayer = BaseClass(iClient);
-	switch(baseplayer.iClassType) {
-		case None:	{}
-		case Wizard:	ToCWizard(baseplayer).OnConditionAdded(condition);
-		case Mercenary:	ToCMercenary(baseplayer).OnConditionAdded(condition);
-	}
-}
-public void TF2_OnConditionRemoved(int iClient, TFCond condition)
-{
-	if(!bEnabled.BoolValue)
-		return;
-	BaseClass baseplayer = BaseClass(iClient);
-	switch(baseplayer.iClassType) {
-		case None:	{}
-		case Wizard:	{
-			if(condition == TFCond_Stealthed) {
-				ToCWizard(baseplayer).fInvisBonus = 0.8;
-			}
-		}
-	}
-}
-
-public Action OnPickup(client, entity) {
-	if(!IsValidClient(client))
-		return Plugin_Continue;
-	char classname[32];
-	GetEdictClassname(entity, classname, sizeof(classname));
-	BaseClass baseplayer = BaseClass(client);
-	switch(baseplayer.iClassType) {
-		case None:		{}
-		case Wizard:	{
-			if(StrContains(classname, "item_ammopack")!=-1 || StrEqual(classname, "tf_ammo_pack"))
-				return Plugin_Handled;
-		}
-		case Mercenary:	{}
-	}
 	return Plugin_Continue;
 }
 
-// Voicemenu handling
-public Action OnVoiceMenu(int iClient, const char[] command, int argc)
-{
-	if(!bEnabled.BoolValue)
-		return Plugin_Continue;
-	if(!IsValidClient(iClient) || argc < 2)
-		return Plugin_Handled;
-	char szCmd1[8]; GetCmdArg(1, szCmd1, sizeof(szCmd1));
-	char szCmd2[8]; GetCmdArg(2, szCmd2, sizeof(szCmd2));
-	BaseClass baseplayer = BaseClass(iClient)
-	switch(baseplayer.iClassType)
-	{
-		case None:		return Plugin_Continue;
-		case Wizard:	ToCWizard(baseplayer).OnVoiceMenu(szCmd1, szCmd2);
-		case Mercenary:	ToCMercenary(baseplayer).OnVoiceMenu(szCmd1, szCmd2);
-	}
-	return Plugin_Handled;
-}
-
-// Sound block
-public Action HookSound(int clients[64], int& numClients, char sound[PLATFORM_MAX_PATH], int& entity, int& channel, float& volume, int& level, int& pitch, int& flags, char soundEntry[PLATFORM_MAX_PATH], int& seed)
-{
-	if(!bEnabled.BoolValue || !IsValidClient(entity) || channel<1)
-	{
-		return Plugin_Continue;
-	}
-	if(channel==SNDCHAN_VOICE)
-	{
-		switch(BaseClass(entity).iClassType)
-		{
-			case None:		{}
-			case Wizard:	return Plugin_Stop;
-			case Mercenary:	{
-				if(StrEqual(sound, "vo/soldier_sf13_spell_generic04.mp3", false))
-					return Plugin_Stop;
-			}
-		}
-	}
-	return Plugin_Continue;
-}
-
-// Menu handling
+/// Menu handling
 public Action CommandCreateClassMenu(int iClient, int args)
 {
-	if(!bEnabled.BoolValue)
-		return Plugin_Continue;
 	if(IsValidClient(iClient))
 	{
 		CreateClassMenu(iClient); // Just pass the client
@@ -717,13 +218,14 @@ public Action CreateClassMenu(int iClient)
 	// More flexible menu selection values
 	// ToDo, make this easier to work with
 	char buffer[16];
-	IntToString(view_as<int>(None), buffer, sizeof(buffer));
+	IntToString(0, buffer, sizeof(buffer));
 	classMenu.AddItem(buffer, "None");
-	IntToString(view_as<int>(Wizard), buffer, sizeof(buffer));
-	classMenu.AddItem(buffer, "Wizard");
-	IntToString(view_as<int>(Mercenary), buffer, sizeof(buffer));
-	classMenu.AddItem(buffer, "Mercenary");
 	classMenu.ExitButton = true;
+
+	Call_StartForward(g_btc.m_hForwards[OnClassMenu]);
+	Call_PushCellRef(classMenu);
+	Call_Finish();
+
 	classMenu.Display(iClient, 30);
 	return Plugin_Handled;
 }
@@ -731,101 +233,226 @@ public Action CreateClassMenu(int iClient)
 public int MenuHandler_PickClass(Menu menu, MenuAction action, int param1, int param2) 
 {
 	if(action == MenuAction_Select) {
-		BaseClass baseplayer = BaseClass(param1); // Param1 is always the client in this case
+		BaseClass baseplayer = BaseClass(param1); /// Param1 is always the client in this case
 		char selection[16];
-		menu.GetItem(param2, selection, sizeof(selection)); // TF2 spaghetti logic, selection has to be converted to a string first
-		baseplayer.iPresetType = view_as<BTCClass>(StringToInt(selection));
+		menu.GetItem(param2, selection, sizeof(selection));
+		baseplayer.iPresetType = StringToInt(selection);
 		PrintToChat(baseplayer.index, "\x01\x070066BB[BeTheClass]\x01 Selection set.");
 	}
 	else if(action == MenuAction_End) {
-		delete menu; // Just in case for other menus so we don't conflict
+		delete menu;
 	}
 }
 
-public Action CommandForceClass(int iClient, int args)
+/// Shamelessly using this from VSH2, nice code Assyrianic
+public int RegisterClass(Handle plugin, const char modulename[MAX_CLASS_NAME_SIZE])
 {
-	char arg1[32];
-	if(args < 1)
-	{
-		arg1 = "@me";
+	if( !ValidateName(modulename) ) {
+		LogError("BTC :: Class Registrar: **** Invalid Name For Class Module: '%s' ****", modulename);
+		return -1;
 	}
-	else GetCmdArg(1, arg1, sizeof(arg1));
-	char target_name[MAX_TARGET_LENGTH];
-	int target_list[MAXPLAYERS], target_count;
-	bool tn_is_ml;
-
-	if ((target_count = ProcessTargetString(
-					arg1,
-					iClient,
-					target_list,
-					MaxClients,
-					COMMAND_FILTER_ALIVE,
-					target_name,
-					sizeof(target_name),
-					tn_is_ml)) <= 0)
-	{
-		ReplyToTargetError(iClient, target_count);
-		return Plugin_Handled;
-	}
-
-	char arg2[32];
-	if(args < 2)
-	{
-		ReplyToCommand(iClient, "[BTC] Usage: sm_forceclass @target index");
-		return Plugin_Handled;
-	}
-	else GetCmdArg(2, arg2, sizeof(arg2));
-	int type = StringToInt(arg2);
-	for (int i = 0; i < target_count; i++)
-	{
-		BaseClass baseplayer = BaseClass(target_list[i]);
-		TF2Attrib_RemoveAll(baseplayer.index);
-		SetVariantString("");
-		AcceptEntityInput(baseplayer.index, "SetCustomModel");
-		switch(type) {
-			case None: {
-				baseplayer.iClassType = None;
-			}
-			case Undefined: {
-				baseplayer.iClassType = Undefined;
-			}
-			case Wizard: {
-				baseplayer.iClassType = Wizard;
-				ToCWizard(baseplayer).OnSpawn();
-			}
-			case Mercenary: {
-				baseplayer.iClassType = Mercenary;
-				ToCMercenary(baseplayer).OnSpawn();
-			}
-			default: {
-				ReplyToCommand(iClient, "[BTC] Invalid class index %i given", type);
-			}
-		}
-		LogAction(iClient, target_list[i], "\"%L\" set \"%L\"'s class to index %i!", iClient, target_list[i], type);
-	}
-	return Plugin_Handled;
-}
-
-public bool TraceEntityFilterPlayer(entity, contentsMask)
-{
-	return entity > MaxClients || !entity;
-}
-
-// SDK calls
-void SDK_PlaySpecificSequence(int client, const char[] strSequence)
-{
-	if(g_hSDKPlaySpecificSequence != INVALID_HANDLE)
-	{
-		SDKCall(g_hSDKPlaySpecificSequence, client, strSequence);
-	}
-}
-
-int SDK_GetMaxAmmo(int client, int iSlot)
-{
-	int iWeapon = GetPlayerWeaponSlot(client, iSlot);
-	int iAmmoType = GetEntProp(iWeapon, Prop_Send, "m_iPrimaryAmmoType");
-	if(g_hSDKGetMaxAmmo != INVALID_HANDLE && iAmmoType > -1)
-		return SDKCall(g_hSDKGetMaxAmmo, client, iAmmoType, -1);
 	
-	return -1;
+	for(int i; i < g_btc.m_hClassesRegistered.Length; i++) {
+		ClassModule module;
+		g_btc.m_hClassesRegistered.GetArray(i, module, sizeof(module));
+		/// if we already have a module of the name, let's check if its plugin is valid.
+		if( !strcmp(module.name, modulename) ) {
+			/// iterate through all plugins and see if it actually exists.
+			for( Handle iter=GetPluginIterator(), p=ReadPlugin(iter); MorePlugins(iter); p = ReadPlugin(iter) ) {
+				if( p==module.plugin ) {
+					LogError("BTC :: Class Registrar: **** Module '%s' Already Registered ****", modulename);
+					return -1;
+				}
+			}
+			/// the boss being registered has the same name but it's of a different handle ID?
+			/// override its plugin ID then, it was probably reloaded.
+			module.plugin = plugin;
+			g_btc.m_hClassesRegistered.SetArray(i, module, sizeof(module));
+			return i + 1;
+		}
+	}
+	
+	/// Couldn't find boss of the name at all, assume it's a brand new boss being reg'd.
+	ClassModule module;
+	module.name = modulename;
+	module.plugin = plugin;
+	g_btc.m_hClassesRegistered.PushArray(module, sizeof(module));
+	return g_btc.m_hClassesRegistered.Length + 1;
+}
+
+public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max)
+{
+	CreateNative("BTC_RegisterPlugin", Native_RegisterClass);
+
+	CreateNative("BTC_Hook", Native_Hook);
+	CreateNative("BTC_HookEx", Native_HookEx);
+	
+	CreateNative("BTC_Unhook", Native_Unhook);
+	CreateNative("BTC_UnhookEx", Native_UnhookEx);
+	
+	CreateNative("BTCBaseClass.BTCBaseClass", Native_BTC_Instance);
+	CreateNative("BTCBaseClass.userid.get", Native_BTC_GetUserid);
+	CreateNative("BTCBaseClass.index.get", Native_BTC_GetIndex);
+
+	CreateNative("BTCBaseClass.GetPropInt", Native_BTC_getPropInt);
+	CreateNative("BTCBaseClass.GetPropFloat", Native_BTC_getPropFloat);
+	CreateNative("BTCBaseClass.GetPropAny", Native_BTC_getProperty);
+
+	CreateNative("BTCBaseClass.SetPropInt", Native_BTC_setPropInt);
+	CreateNative("BTCBaseClass.SetPropFloat", Native_BTC_setPropFloat);
+	CreateNative("BTCBaseClass.SetPropAny", Native_BTC_setProperty);
+
+	CreateNative("BTCBaseClass.SpawnWeapon", Native_BTC_SpawnWep);
+	CreateNative("BTCBaseClass.RemoveAllItems", Native_BTC_RemoveAllItems);
+
+	RegPluginLibrary("BTC");
+	return APLRes_Success;
+}
+
+public int Native_RegisterClass(Handle plugin, int numParams)
+{
+	char module_name[MAX_CLASS_NAME_SIZE]; GetNativeString(1, module_name, sizeof(module_name));
+	/// ALL PROPS TO COOKIES.NET AKA COOKIES.IO
+	return RegisterClass(plugin, module_name);
+}
+
+public any Native_BTC_Instance(Handle plugin, int numParams)
+{
+	BaseClass player = BaseClass(GetNativeCell(1), GetNativeCell(2));
+	return player;
+}
+
+public int Native_BTC_GetUserid(Handle plugin, int numParams)
+{
+	BaseClass player = GetNativeCell(1);
+	return player.userid;
+}
+public int Native_BTC_GetIndex(Handle plugin, int numParams)
+{
+	BaseClass player = GetNativeCell(1);
+	return player.index;
+}
+
+public int Native_BTC_getPropInt(Handle plugin, int numParams)
+{
+	BaseClass player = GetNativeCell(1);
+	char prop_name[64]; GetNativeString(2, prop_name, 64);
+	int item;
+	if( g_btc.m_hPlayerFields[player.index].GetValue(prop_name, item) )
+		return item;
+	return 0;
+}
+public int Native_BTC_setPropInt(Handle plugin, int numParams)
+{
+	BaseClass player = GetNativeCell(1);
+	char prop_name[64]; GetNativeString(2, prop_name, 64);
+	int item = GetNativeCell(3);
+	return g_btc.m_hPlayerFields[player.index].SetValue(prop_name, item);
+}
+
+public any Native_BTC_getPropFloat(Handle plugin, int numParams)
+{
+	BaseClass player = GetNativeCell(1);
+	char prop_name[64]; GetNativeString(2, prop_name, 64);
+	float item;
+	if( g_btc.m_hPlayerFields[player.index].GetValue(prop_name, item) )
+		return item;
+	return 0;
+}
+public int Native_BTC_setPropFloat(Handle plugin, int numParams)
+{
+	BaseClass player = GetNativeCell(1);
+	char prop_name[64]; GetNativeString(2, prop_name, 64);
+	float item = GetNativeCell(3);
+	return g_btc.m_hPlayerFields[player.index].SetValue(prop_name, item);
+}
+
+public int Native_BTC_getProperty(Handle plugin, int numParams)
+{
+	BaseClass player = GetNativeCell(1);
+	char prop_name[64]; GetNativeString(2, prop_name, 64);
+	any item;
+	if( g_btc.m_hPlayerFields[player.index].GetValue(prop_name, item) )
+		return item;
+	return 0;
+}
+public int Native_BTC_setProperty(Handle plugin, int numParams)
+{
+	BaseClass player = GetNativeCell(1);
+	char prop_name[64]; GetNativeString(2, prop_name, 64);
+	any item = GetNativeCell(3);
+	return g_btc.m_hPlayerFields[player.index].SetValue(prop_name, item);
+}
+
+public int Native_Hook(Handle plugin, int numParams)
+{
+	int btcHook = GetNativeCell(1);
+	Function Func = GetNativeFunction(2);
+	if( g_btc.m_hForwards[btcHook] != null )
+		g_btc.m_hForwards[btcHook].AddFunction(plugin, Func);
+}
+public int Native_HookEx(Handle plugin, int numParams)
+{
+	int btcHook = GetNativeCell(1);
+	Function Func = GetNativeFunction(2);
+	if( g_btc.m_hForwards[btcHook] != null )
+		return g_btc.m_hForwards[btcHook].AddFunction(plugin, Func);
+	return 0;
+}
+
+public int Native_Unhook(Handle plugin, int numParams)
+{
+	int btcHook = GetNativeCell(1);
+	if( g_btc.m_hForwards[btcHook] != null )
+		g_btc.m_hForwards[btcHook].RemoveFunction(plugin, GetNativeFunction(2));
+}
+public int Native_UnhookEx(Handle plugin, int numParams)
+{
+	int btcHook = GetNativeCell(1);
+	if( g_btc.m_hForwards[btcHook] != null )
+		return g_btc.m_hForwards[btcHook].RemoveFunction(plugin, GetNativeFunction(2));
+	return 0;
+}
+
+public int Native_BTC_SpawnWep(Handle plugin, int numParams)
+{
+	BaseClass player = GetNativeCell(1);
+	char classname[64]; GetNativeString(2, classname, 64);
+	int itemindex = GetNativeCell(3);
+	int level = GetNativeCell(4);
+	int quality = GetNativeCell(5);
+	char attributes[128]; GetNativeString(6, attributes, 128);
+	return player.SpawnWeapon(classname, itemindex, level, quality, attributes);
+}
+
+public int Native_BTC_RemoveAllItems(Handle plugin, int numParams)
+{
+	BaseClass player = GetNativeCell(1);
+	bool weps = numParams <= 1 ? true : GetNativeCell(2);
+	player.RemoveAllItems(weps);
+}
+
+stock bool ValidateName(const char[] name)
+{
+	int length = strlen(name);
+	for( int i; i<length; ++i ) {
+		int holder = name[i];
+		/// Invalid name, names may only contains numbers, underscores, and normal letters.
+		if( !(IsCharAlpha(holder) || IsCharNumeric(holder) || holder=='_') )
+			return false;
+	}
+	/// A name is, of course, only valid if it's 1 or more chars long, though longer is recommended
+	return (length > 0);
+}
+
+stock bool IsValidClient(int clientIdx, bool isPlayerAlive=false)
+{
+	if (clientIdx <= 0 || clientIdx > MaxClients) return false;
+	if(isPlayerAlive) return IsClientInGame(clientIdx) && IsPlayerAlive(clientIdx);
+	return IsClientInGame(clientIdx);
+}
+
+stock int GetOwner(const int ent)
+{
+	return( IsValidEntity(ent) ) ? GetEntPropEnt(ent, Prop_Send, "m_hOwnerEntity") : -1;
 }

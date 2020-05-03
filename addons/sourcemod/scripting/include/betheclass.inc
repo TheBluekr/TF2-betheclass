@@ -3,84 +3,95 @@
 #endif
 #define _betheclass_included
 
-enum BTCClass { // Add any classes added here
-	None = -1,
-	Undefined = 0,
-	Wizard = 1,
-	Mercenary = 2
-};
+#include <tf2>
+#include <tf2_stocks>
+#include <tf2items_stocks>
 
-methodmap BTCBase {
-	public native BTCBase(const int index, bool userid=false);
+#define MAX_CLASS_NAME_SIZE    64
+
+methodmap BTCBaseClass {
+	public native BTCBaseClass(const int ind, bool uid = false);
 
 	property int userid {
 		public native get();
 	}
-	
 	property int index {
 		public native get();
 	}
 
-	property BTCClass iClassType {
-		public native get();
-		public native set(const BTCClass val);
-	}
-
-	// Wizard specific property
-	property float fMana {
-		public native get();
-		public native set(const float val);
-	}
-
-	// Time in seconds (with decimal)
-	public native void Jam(const float val);
-
-	// Mercenary specific property
-	property int iGrenadeStock {
-		public native get();
-		public native set(const int val);
-	}
-	// Time in seconds (with decimal)
-	property float fGrenadeCooldown {
-		public native get();
-		public native set(const float val);
-	}
+	public native int GetPropInt(const char prop_name[64]);
+	public native float GetPropFloat(const char prop_name[64]);
+	public native any GetPropAny(const char prop_name[64]);
 	
-	public native any GetProperty(const char prop_name[64]);
-	public native void SetProperty(const char prop_name[64], any value);
+	public native bool SetPropInt(const char prop_name[64], int value);
+	public native bool SetPropFloat(const char prop_name[64], float value);
+	public native bool SetPropAny(const char prop_name[64], any value);
 
-	public native void Reset();
-	public native bool IsCustom();
-	public native bool IsWizard();
-	public native bool IsMercenary();
+	public native void RemoveAllItems();
+	public native int SpawnWeapon(char[] name, const int index, const int level, const int qual, char[] att);
 
-	public native void OnSpawn();
-	public native void Convert(const BTCClass index);
+	property int iPresetType {
+		public get() {
+			return this.GetPropInt("iPresetType");
+		}
+		public set(int val) {
+			this.SetPropInt("iPresetType", val);
+		}
+	}
+	property int iClassType {
+		public get() {
+			return this.GetPropInt("iClassType");
+		}
+		public set(int val) {
+			this.SetPropInt("iClassType", val);
+		}
+	}
+	property int iTeam {
+		public get() {
+			return view_as<int>(TF2_GetClientTeam(this.index));
+		}
+	}
+	property TFTeam Team {
+		public get() {
+			return TF2_GetClientTeam(this.index);
+		}
+	}
 };
 
-// Native for Faust to adaptively get valid boundaries
-native BTCClass BTC_MaxClass();
-
 /**
- * Called when BTC handles a client spawn event
- *
- * @param client	Client index
- * @param index		Reference to custom class index, customizable
- *
- * @return	Anything above Plugin_Continue will prevent the event
+ * Registers a class subplugin.
+ * 
+ * @param     plugin_name -> module name you want your calling plugin to be identified under
+ * @return    integer of the plugin array index, -1 if error.
  */
-//forward Action BTC_OnSpawn(int client, BTCClass &index);
-/**
- * Called when a client is using a BTC ability
- *
- * @param client	Client index
- * @param index		Custom class index
- * @param ability	Ability index, check classes for values as they're not consistent
- *
- * @return	Anything above Plugin_Continue will prevent use
- */
-//forward Action BTC_OnAbility(int client, BTCClass index, int ability);
+native int BTC_RegisterPlugin(const char plugin_name[64]);
 
+enum { /// Hook types
+	OnCallDownload=0,
+	OnPlayerThink,
+	OnClassMenu,
+	MaxBTCForwards
+};
+
+typeset BTCHookCB {
+	/// OnCallDownloads
+	function Action ();
+	function void ();
+
+	/// OnPlayerThink
+	function Action (const BTCBaseClass player);
+	function void (const BTCBaseClass player);
+
+	/// OnClassMenu
+	function void (Menu& menu);
+};
+
+/// Use hooktype enum on these.
+native void BTC_Hook(const int callbacktype, BTCHookCB callback);
+native bool BTC_HookEx(const int callbacktype, BTCHookCB callback);
+
+native void BTC_Unhook(const int callbacktype, BTCHookCB callback);
+native bool BTC_UnhookEx(const int callbacktype, BTCHookCB callback);
 
 public SharedPlugin __pl_betheclass = 
 {
@@ -96,32 +107,32 @@ public SharedPlugin __pl_betheclass =
 #if !defined REQUIRE_PLUGIN
 public __pl_betheclass_SetNTVOptional()
 {
-	// BaseClass methodmap
-	MarkNativeAsOptional("BTCBase.BTCBase");
-	MarkNativeAsOptional("BTCBase.userid.get");
-	MarkNativeAsOptional("BTCBase.index.get");
-	MarkNativeAsOptional("BTCBase.iClassType.get");
-	MarkNativeAsOptional("BTCBase.iClassType.set");
-	MarkNativeAsOptional("BTCBase.bIsMinion.set");
-	MarkNativeAsOptional("BTCBase.GetProperty");
-	MarkNativeAsOptional("BTCBase.SetProperty");
-	MarkNativeAsOptional("BTCBase.Reset");
-	MarkNativeAsOptional("BTCBase.IsCustom");
-	MarkNativeAsOptional("BTCBase.IsWizard");
-	MarkNativeAsOptional("BTCBase.IsMercenary");
+	MarkNativeAsOptional("BTC_RegisterPlugin");
+	MarkNativeAsOptional("BTCBaseClass.BTCBaseClass");
+	MarkNativeAsOptional("BTCBaseClass.userid.get");
+	MarkNativeAsOptional("BTCBaseClass.index.get");
 
-	MarkNativeAsOptional("BTCBase.OnSpawn");
-	MarkNativeAsOptional("BTCBase.Convert");
+	MarkNativeAsOptional("BTCBaseClass.iPresetType.get");
+	MarkNativeAsOptional("BTCBaseClass.iPresetType.set");
 
-	MarkNativeAsOptional("BTCBase.fMana.get");
-	MarkNativeAsOptional("BTCBase.fMana.set");
-	MarkNativeAsOptional("BTCBase.Jam");
+	MarkNativeAsOptional("BTCBaseClass.iClassType.get");
+	MarkNativeAsOptional("BTCBaseClass.iClassType.set");
 
-	MarkNativeAsOptional("BTCBase.iGrenadeStock.get");
-	MarkNativeAsOptional("BTCBase.iGrenadeStock.set");
-	MarkNativeAsOptional("BTCBase.fGrenadeCooldown.get");
-	MarkNativeAsOptional("BTCBase.fGrenadeCooldown.set");
+	MarkNativeAsOptional("BTCBaseClass.GetPropInt");
+	MarkNativeAsOptional("BTCBaseClass.GetPropFloat");
+	MarkNativeAsOptional("BTCBaseClass.GetPropAny");
+		
+	MarkNativeAsOptional("BTCBaseClass.SetPropInt");
+	MarkNativeAsOptional("BTCBaseClass.SetPropFloat");
+	MarkNativeAsOptional("BTCBaseClass.SetPropAny");
 
-	MarkNativeAsOptional("BTC_MaxClass");
+	MarkNativeAsOptional("BTCBaseClass.RemoveAllItems");
+	MarkNativeAsOptional("BTCBaseClass.SpawnWeapon");
+
+
+	MarkNativeAsOptional("BTC_Hook");
+	MarkNativeAsOptional("BTC_HookEx");
+	MarkNativeAsOptional("BTC_Unhook");
+	MarkNativeAsOptional("BTC_UnhookEx");
 }
 #endif
