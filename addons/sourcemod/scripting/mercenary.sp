@@ -1,8 +1,7 @@
 /** Disclaimer, majority of the code here is re-used code from Vee's BeTheMerc and Grenade plugin. Credits to her for providing a huge base for this rewritten version. **/
 
 #include <sourcemod>
-#include <vsh2>
-#include <vsh2_betheclass>
+#include <betheclass>
 #include <tf2attributes>
 #include <tf2>
 #include <tf2_stocks>
@@ -128,18 +127,6 @@ methodmap CMercenary < BTCBaseClass
 			this.SetPropFloat("fGrenadeThrowCooldown", val);
 		}
 	}
-	property TFTeam Team {
-		public get()
-		{
-			return TF2_GetClientTeam(this.index);
-		}
-	}
-	property int iTeam {
-		public get()
-		{
-			return view_as<int>(TF2_GetClientTeam(this.index));
-		}
-	}
 	public void Init()
 	{
 		this.iGrenadeStock = g_btc_mercenary.m_hCvars[MercenaryGrenade].IntValue;
@@ -150,8 +137,7 @@ methodmap CMercenary < BTCBaseClass
 	{
 		char sModel[128];
 		GetEntPropString(this.index, Prop_Data, "m_ModelName", sModel, sizeof(sModel)); // Get the complete Modelname.
-		VSH2Player player = VSH2Player(this.index);
-		if(!StrEqual(sModel, Merc_Model, false) && player.GetPropAny("bIsBoss"))
+		if(!StrEqual(sModel, Merc_Model, false))
 		{
 			this.iClassType = 0;
 			//this.UpdateHUD(merc.index, GrenadeHUD, "", 0.75, 0.85, 0.5, 255, 255, 255, 255, 2, 0.0, 0.0, 0.0);

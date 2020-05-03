@@ -68,19 +68,35 @@ native int BTC_RegisterPlugin(const char plugin_name[64]);
 
 enum { /// Hook types
 	OnCallDownload=0,
-	OnPlayerThink,
+	OnClassThink,
+	OnClassSpawn,
+	OnClassDeath,
+	OnClassHurt,
+	OnClassResupply,
 	OnClassMenu,
 	MaxBTCForwards
 };
 
 typeset BTCHookCB {
 	/// OnCallDownloads
-	function Action ();
 	function void ();
 
-	/// OnPlayerThink
-	function Action (const BTCBaseClass player);
+	/// OnClassThink
 	function void (const BTCBaseClass player);
+
+	/**
+	 * OnClassSpawn
+	 * OnClassResupply
+	*/
+	function Action (const BTCBaseClass player, Event event);
+	function void (const BTCBaseClass player, Event event);
+
+	/**
+	 * OnClassKilled
+	 * OnClassHurt
+	*/
+	function Action (const BTCBaseClass player, const BTCBaseClass victim, Event event);
+	function void (const BTCBaseClass player, const BTCBaseClass victim, Event event);
 
 	/// OnClassMenu
 	function void (Menu& menu);
