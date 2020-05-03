@@ -21,9 +21,9 @@
 #define Soldier_Model				"models/player/soldier.mdl"
 
 public Plugin myinfo = {
-	name = "BTC mercenary subplugin",
+	name = "BTC Mercenary subplugin",
 	author = "TheBluekr",
-	description = "Addon for VSH2 version of Be The Class",
+	description = "Addon for Be The Class Hub",
 	version = "0.1",
 	url = "https://git.thebluekr.nl/vspr/be-the-class"
 };
@@ -55,6 +55,8 @@ public void OnPluginStart() {
 	g_btc_mercenary.m_hCvars[MercenaryLimit] = CreateConVar("btc_mercenary_limit", "3", "Limit for amount of mercenaries", FCVAR_NOTIFY, true, 0.0, false, 0.0);
 	g_btc_mercenary.m_hCvars[MercenaryGrenade] = CreateConVar("btc_mercenary_grenade", "2", "Grenade stock limit for mercenaries", FCVAR_NOTIFY, true, 0.0, false, 0.0);
 	g_btc_mercenary.m_hCvars[MercenaryGrenadeRegen] = CreateConVar("btc_mercenary_grenade_regen", "60.0", "Regen interval for grenades for mercenaries", FCVAR_NOTIFY, true, 0.0, false, 0.0);
+
+	HookEvent("item_pickup", OnItemPickUp, EventHookMode_Pre);
 }
 
 public void OnAllPluginsLoaded()
@@ -127,11 +129,10 @@ methodmap CMercenary < BTCBaseClass
 			this.SetPropFloat("fGrenadeThrowCooldown", val);
 		}
 	}
-	public void Init()
+	public void UpdateHUD(Handle hHUD, const char[] text, float x, float y, float holdTime, int r, int g, int b, int a, int effect, float fxTime, float fadeIn, float fadeOut)
 	{
-		this.iGrenadeStock = g_btc_mercenary.m_hCvars[MercenaryGrenade].IntValue;
-		this.fGrenadeCooldown = 0.0;
-		this.fGrenadeThrowCooldown = 0.0;
+		SetHudTextParams(x, y, holdTime, r, g, b, a, effect, fxTime, fadeIn, fadeOut);
+		ShowSyncHudText(this.index, hHUD, text);
 	}
 	public void OnSpawn()
 	{
@@ -140,7 +141,7 @@ methodmap CMercenary < BTCBaseClass
 		if(!StrEqual(sModel, Merc_Model, false))
 		{
 			this.iClassType = 0;
-			//this.UpdateHUD(merc.index, GrenadeHUD, "", 0.75, 0.85, 0.5, 255, 255, 255, 255, 2, 0.0, 0.0, 0.0);
+			this.UpdateHUD(g_btc_mercenary.m_hHUDs[GrenadeHUD], "", 0.75, 0.85, 0.5, 255, 255, 255, 255, 2, 0.0, 0.0, 0.0);
 			return;
 		}
 		if(IsValidClient(this.index)) {
@@ -149,56 +150,53 @@ methodmap CMercenary < BTCBaseClass
 			TF2Attrib_SetByName(this.index, "max health additive penalty", -50.0);
 			SetEntityHealth(this.index, 175);
 
-			player.RemoveAllItems();
+			this.RemoveAllItems();
 
 			// Grenades
 			this.iGrenadeStock = g_btc_mercenary.m_hCvars[MercenaryGrenade].IntValue;
+			this.fGrenadeThrowCooldown = 0.0;
 			this.fGrenadeCooldown = 0.0;
 
 			SetVariantString(Merc_Model);
 			AcceptEntityInput(this.index, "SetCustomModel");
 			SetEntProp(this.index, Prop_Send, "m_bUseClassAnimations", 1);
-			player.SpawnWeapon("tf_weapon_scattergun", 1153, 1, 0, "2030 ; 1 ; 808 ; 0 ; 1 ; 1 ; 6 ; 0.75 ; 106 ; 0.75 ; 547 ; 1");
-			player.SpawnWeapon("tf_weapon_smg", 1098, 1, 0, "306 ; 0 ; 647 ; 0 ; 392 ; 0.5 ; 4 ; 1.2 ; 2 ; 1.5 ; 106 ; 0.5 ; 96 ; 3.0 ; 144 ; 1 ; 51 ; 0 ; 78 ; 6.25");
-			player.SpawnWeapon("tf_weapon_shovel", 30758, 1, 0, "2030 ; 1 ; 149 ; 3 ; 851 ; 1.15 ; 1 ; 0.9 ; 851 ; 1,4375‬");
-			player.SpawnWeapon("tf_weapon_grapplinghook", 1152, 1, 0, "547 ; 1 ; 199 ; 1 ; 289 ; 1");
-			//SpawnWeapon(merc.index, "tf_weapon_spellbook", 1132, 1, 0, "547 ; 0 ; 199 ; 0 ; 289 ; 1 ; 643 ; 0.125 ; 280 ; 2");
+			this.SpawnWeapon("tf_weapon_scattergun", 1153, 1, 0, "2030 ; 1 ; 808 ; 0 ; 1 ; 1 ; 6 ; 0.75 ; 106 ; 0.75 ; 547 ; 1");
+			this.SpawnWeapon("tf_weapon_smg", 1098, 1, 0, "306 ; 0 ; 647 ; 0 ; 392 ; 0.5 ; 4 ; 1.2 ; 2 ; 1.5 ; 106 ; 0.5 ; 96 ; 3.0 ; 144 ; 1 ; 51 ; 0 ; 78 ; 6.25");
+			this.SpawnWeapon("tf_weapon_shovel", 30758, 1, 0, "2030 ; 1 ; 149 ; 3 ; 851 ; 1.15 ; 1 ; 0.9 ; 851 ; 1,4375‬");
+			this.SpawnWeapon("tf_weapon_grapplinghook", 1152, 1, 0, "547 ; 1 ; 199 ; 1 ; 289 ; 1");
+			//this.SpawnWeapon(merc.index, "tf_weapon_spellbook", 1132, 1, 0, "547 ; 0 ; 199 ; 0 ; 289 ; 1 ; 643 ; 0.125 ; 280 ; 2");
 			SetAmmo(this.index, TFWeaponSlot_Primary, 20);
 			SetAmmo(this.index, TFWeaponSlot_Secondary, 200); /// Bug fix, Merc spawns with 32 ammo on secondary
 		}
 	}
-	public void OnDeath(BaseClass attacker, BaseClass victim, Event event)
+	public void OnDeath(BTCBaseClass attacker, Event event)
 	{
-		this.UpdateHUD(this.index, GrenadeHUD, "", 0.75, 0.85, 0.5, 255, 255, 255, 255, 2, 0.0, 0.0, 0.0);
+		this.UpdateHUD(g_btc_mercenary.m_hHUDs[GrenadeHUD], "", 0.75, 0.85, 0.5, 255, 255, 255, 255, 2, 0.0, 0.0, 0.0);
 	}
-	public void OnKill(BaseClass attacker, BaseClass victim, Event event)
+	public void OnKill(BTCBaseClass victim, Event event)
 	{
 		if(event.GetInt("damagebits") == 32) {
 			event.SetInt("customkill", TF_CUSTOM_TAUNT_GRENADE);
 			event.SetString("weapon_logclassname", "merc_grenade");
 		}
 	}
-	public void OnItemPickUp(BaseClass baseplayer, char item[64], Event event)
+	public void OnItemPickUp(char item[64], Event event)
 	{
 		if(StrEqual(item, "ammopack_small", false))
 		{
-			int ammo = GetAmmo(baseplayer.index, TFWeaponSlot_Secondary);
-			int maxAmmo = SDK_GetMaxAmmo(baseplayer.index, TFWeaponSlot_Secondary);
-			if(ammo < maxAmmo) // Bug fix, we can go outside the maximum intended ammo pool by +1 if picking up an ammo box at max ammo
-				SetAmmo(baseplayer.index, TFWeaponSlot_Secondary, ammo+1);
+			/// Fix for receiving 31 ammo instead of 32
+			int ammo = GetAmmo(this.index, TFWeaponSlot_Secondary);
+			int maxAmmo = SDK_GetMaxAmmo(this.index, TFWeaponSlot_Secondary);
+			if(ammo < maxAmmo)
+				SetAmmo(this.index, TFWeaponSlot_Secondary, ammo+1);
 		}
 	}
-
-	public void OnVoiceMenu(char[] szCmd1, char[] szCmd2)
-	{
-	}
-
 	public void Think()
 	{
 		if(IsClientAlive(this.index)) {
 			char GrenadeHUDText[255]; // Display of current amount grenades
 			Format(GrenadeHUDText, sizeof(GrenadeHUDText), "Grenades: %i", this.iGrenadeStock);
-			//this.UpdateHUD(this.index, GrenadeHUD, GrenadeHUDText, 0.75, 0.85, 0.5, 255, 255, 255, 255, 2, 0.0, 0.0, 0.0);
+			this.UpdateHUD(g_btc_mercenary.m_hHUDs[GrenadeHUD], GrenadeHUDText, 0.75, 0.85, 0.5, 255, 255, 255, 255, 2, 0.0, 0.0, 0.0);
 		}
 
 		char sModel[128];
@@ -229,10 +227,6 @@ methodmap CMercenary < BTCBaseClass
 			FakeClientCommand(this.index, "use tf_weapon_grapplinghook");
 		}
 	}
-
-	public void OnConditionAdded(TFCond condition)
-	{
-	}
 }
 
 public CMercenary ToCMercenary(const BTCBaseClass guy)
@@ -245,14 +239,32 @@ int g_iMercID;
 public void OnLibraryAdded(const char[] name) {
 	if( StrEqual(name, "BTC") ) {
 		g_iMercID = BTC_RegisterPlugin("mercenary");
+		LoadBTCHooks();
 	}
 }
+
+public void LoadBTCHooks()
+{
+	if(!BTC_HookEx(OnCallDownload, Mercenary_OnCallDownloads))
+		LogError("Error loading OnCallDownload forwards for Mercenary subplugin.");
+	if(!BTC_HookEx(OnClassThink, Mercenary_OnClassThink))
+		LogError("Error loading OnClassThink forwards for Mercenary subplugin.");
+	if(!BTC_HookEx(OnClassSpawn, Mercenary_OnClassSpawn))
+		LogError("Error loading OnClassSpawn forwards for Mercenary subplugin.");
+	if(!BTC_HookEx(OnClassDeath, Mercenary_OnClassDeath))
+		LogError("Error loading OnClassDeath forwards for Mercenary subplugin.");
+	if(!BTC_HookEx(OnClassResupply, Mercenary_OnClassResupply))
+		LogError("Error loading OnClassResupply forwards for Mercenary subplugin.");
+	if(!BTC_HookEx(OnClassMenu, Mercenary_OnClassMenu))
+		LogError("Error loading OnClassMenu forwards for Mercenary subplugin.");
+}
+
 
 stock bool IsMercenary(const BTCBaseClass player) {
 	return player.GetPropInt("iClassType") == g_iMercID;
 }
 
-public void Merc_OnCallDownloads() {
+public void Mercenary_OnCallDownloads() {
 	// Precache particle systems
 	PrecacheParticleSystem(Grenade_Trail_Red);
 	PrecacheParticleSystem(Grenade_Trail_Blu);
@@ -268,8 +280,38 @@ public void Merc_OnCallDownloads() {
 	PrecacheSound(Prime_Sound, true);
 }
 
-public void GrenadeThrow(CMercenary merc)
+public void Mercenary_OnClassMenu(Menu &menu)
 {
+	char tostr[10]; IntToString(g_iMercID, tostr, sizeof(tostr));
+	menu.AddItem(tostr, "Mercenary");
+}
+
+public void Mercenary_OnClassThink(const BTCBaseClass player) {
+	if(!IsMercenary(player))
+		return;
+	ToCMercenary(player).Think();
+}
+
+public void Mercenary_OnClassSpawn(const BTCBaseClass player, Event event) {
+	if(!IsMercenary(player))
+		return;
+	ToCMercenary(player).OnSpawn();
+}
+
+public void Mercenary_OnClassDeath(const BTCBaseClass attacker, const BTCBaseClass victim, Event event) {
+	if(IsMercenary(attacker))
+		ToCMercenary(attacker).OnKill(victim, event);
+	else if (IsMercenary(victim))
+		ToCMercenary(victim).OnDeath(attacker, event);
+}
+
+public void Mercenary_OnClassResupply(const BTCBaseClass player, Event event) {
+	if(!IsMercenary(player))
+		return;
+	ToCMercenary(player).OnSpawn();
+}
+
+public void GrenadeThrow(CMercenary merc) {
 	if(merc.iGrenadeStock <= 0) {
 		EmitSoundToClient(merc.index, NoThrow_Sound, merc.index, _, _, _, 1.0);
 		return;
@@ -309,6 +351,17 @@ public void GrenadeThrow(CMercenary merc)
 	merc.iGrenadeStock--;
 	if(merc.fGrenadeCooldown <= 0.0) /// Assuming we were on the maximum grenades there should be no cooldown (yet)
 		merc.fGrenadeCooldown = g_btc_mercenary.m_hCvars[MercenaryGrenadeRegen].FloatValue;
+}
+
+public Action OnItemPickUp(Event event, const char[] eventName, bool dontBroadcast)
+{
+	BTCBaseClass player = BTCBaseClass(GetEventInt(event, "userid"), true);
+	if(!IsMercenary(player))
+		return Plugin_Continue;
+	char item[64];
+	GetEventString(event, "item", item, sizeof(item));
+	ToCMercenary(player).OnItemPickUp(item, event);
+	return Plugin_Continue;
 }
 
 public void GrenadeExplode(int iRef)

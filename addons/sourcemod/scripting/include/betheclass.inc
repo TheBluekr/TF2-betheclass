@@ -92,7 +92,7 @@ typeset BTCHookCB {
 	function void (const BTCBaseClass player, Event event);
 
 	/**
-	 * OnClassKilled
+	 * OnClassDeath
 	 * OnClassHurt
 	*/
 	function Action (const BTCBaseClass player, const BTCBaseClass victim, Event event);

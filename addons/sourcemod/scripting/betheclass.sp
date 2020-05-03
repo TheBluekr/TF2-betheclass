@@ -148,6 +148,8 @@ methodmap BaseClass
 }
 
 public void OnPluginStart() {
+	RegConsoleCmd("sm_class", CommandCreateClassMenu, "Usage: sm_class");
+	
 	HookEvent("player_spawn", OnSpawn);
 	HookEvent("player_death", OnPlayerDeath, EventHookMode_Pre);
 	HookEvent("player_hurt", OnPlayerHurt, EventHookMode_Pre);
@@ -163,10 +165,6 @@ public void OnPluginStart() {
 
 	g_btc.m_hPlayerFields[0] = new StringMap();
 	g_btc.m_hClassesRegistered = new ArrayList(sizeof(ClassModule));
-}
-
-public void OnLibraryAdded(const char[] name) {
-	RegConsoleCmd("sm_class", CommandCreateClassMenu, "Usage: sm_class");
 }
 
 public Action OnSpawn(Event event, const char[] name, bool dontBroadcast) {
@@ -258,9 +256,9 @@ public void OnClientPutInServer(int client) {
 }
 
 public void OnClientDisconnect(int client) {
-	BaseClass baseplayer = BaseClass(client);
-	baseplayer.iPresetType = 0;
-	baseplayer.iClassType = 0;
+	//BaseClass baseplayer = BaseClass(client);
+	g_btc.m_hPlayerFields[client].SetValue("iPresetType", 0);
+	g_btc.m_hPlayerFields[client].SetValue("iClassType", 0);
 	/// Just to prevent limit from glitching out
 }
 
@@ -272,12 +270,11 @@ public void OnMapStart() {
 }
 
 public Action Timer_PlayerThink(Handle hTimer) {
-	BaseClass player;
 	for(int i=MaxClients; i; --i) {
 		if(!IsValidClient(i, false))
 			continue;
 		
-		player = BaseClass(i);
+		BaseClass player = BaseClass(i);
 
 		Call_StartForward(g_btc.m_hForwards[OnClassThink]);
 		Call_PushCell(player);
