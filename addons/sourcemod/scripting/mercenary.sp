@@ -56,8 +56,9 @@ public void OnPluginStart() {
 	g_btc_mercenary.m_hCvars[MercenaryGrenade] = CreateConVar("btc_mercenary_grenade", "2", "Grenade stock limit for mercenaries", FCVAR_NOTIFY, true, 0.0, false, 0.0);
 	g_btc_mercenary.m_hCvars[MercenaryGrenadeRegen] = CreateConVar("btc_mercenary_grenade_regen", "60.0", "Regen interval for grenades for mercenaries", FCVAR_NOTIFY, true, 0.0, false, 0.0);
 
-	for( int i; i<MaxBTCMercHUDs; i++ )
-		g_btc_mercenary.m_hHUDs[i] = CreateHudSynchronizer();
+	//for( int i; i<MaxBTCMercHUDs; i++ )
+		//g_btc_mercenary.m_hHUDs[i] = CreateHudSynchronizer();
+	g_btc_mercenary.m_hHUDs[GrenadeHUD] = CreateHudSynchronizer();
 
 	HookEvent("item_pickup", OnItemPickUp, EventHookMode_Pre);
 }
@@ -199,6 +200,12 @@ methodmap CMercenary < BTCBaseClass
 			AcceptEntityInput(this.index, "SetCustomModel");
 			SetEntProp(this.index, Prop_Send, "m_bUseClassAnimations", 1);
 		}
+
+		if(this.fGrenadeCooldown > 0.0)
+			this.fGrenadeCooldown -= 0.1;
+		if(this.fGrenadeThrowCooldown > 0.0)
+			this.fGrenadeThrowCooldown -= 0.1;
+
 		if(this.iGrenadeStock < g_btc_mercenary.m_hCvars[MercenaryGrenade].IntValue && this.fGrenadeCooldown <= 0.0) {
 			this.iGrenadeStock++;
 			if(this.iGrenadeStock < g_btc_mercenary.m_hCvars[MercenaryGrenade].IntValue) /// In case we're still below max
@@ -290,7 +297,10 @@ public void MercSpawn(BTCBaseClass player) {
 }
 
 public void Mercenary_OnClassSpawn(const BTCBaseClass player, Event event) {
-	SetPawnTimer(MercSpawn, 0.2, player);
+	if(player.GetPropInt("iPresetType") != g_iMercID)
+		return;
+	player.SetPropInt("iClassType", g_iMercID);
+	SetPawnTimer(MercSpawn, 0.1, player);
 }
 
 public void Mercenary_OnClassDeath(const BTCBaseClass attacker, const BTCBaseClass victim, Event event) {
@@ -306,7 +316,18 @@ public void Mercenary_OnClassResupply(const BTCBaseClass player, Event event) {
 	ToCMercenary(player).OnSpawn();
 }
 
-public void GrenadeThrow(CMercenary merc) {
+public Action OnItemPickUp(Event event, const char[] eventName, bool dontBroadcast)
+{
+	BTCBaseClass player = BTCBaseClass(GetEventInt(event, "userid"), true);
+	if(!IsMercenary(player))
+		return Plugin_Continue;
+	char item[64];
+	GetEventString(event, "item", item, sizeof(item));
+	ToCMercenary(player).OnItemPickUp(item, event);
+	return Plugin_Continue;
+}
+
+stock void GrenadeThrow(CMercenary merc) {
 	if(merc.iGrenadeStock <= 0) {
 		EmitSoundToClient(merc.index, NoThrow_Sound, merc.index, _, _, _, 1.0);
 		return;
@@ -348,18 +369,7 @@ public void GrenadeThrow(CMercenary merc) {
 		merc.fGrenadeCooldown = g_btc_mercenary.m_hCvars[MercenaryGrenadeRegen].FloatValue;
 }
 
-public Action OnItemPickUp(Event event, const char[] eventName, bool dontBroadcast)
-{
-	BTCBaseClass player = BTCBaseClass(GetEventInt(event, "userid"), true);
-	if(!IsMercenary(player))
-		return Plugin_Continue;
-	char item[64];
-	GetEventString(event, "item", item, sizeof(item));
-	ToCMercenary(player).OnItemPickUp(item, event);
-	return Plugin_Continue;
-}
-
-public void GrenadeExplode(int iRef)
+stock void GrenadeExplode(int iRef)
 {
 	int iGrenade = EntRefToEntIndex(iRef);
 	if(!IsValidEntity(iGrenade))
