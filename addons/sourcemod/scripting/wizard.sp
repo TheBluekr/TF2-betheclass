@@ -66,6 +66,8 @@ enum struct BTCGlobals_Wizard {
 BTCGlobals_Wizard g_btc_wizard;
 
 public void OnPluginStart() {
+	RegConsoleCmd("sm_wizard", CommandWizardDebug, "Usage: sm_wizard");
+
 	g_btc_wizard.m_hCvars[WizardLimit] = CreateConVar("btc_wizard_limit", "2", "Limit for amount of wizards", FCVAR_NOTIFY, true, 0.0, false, 0.0);
 	g_btc_wizard.m_hCvars[WizardMana] = CreateConVar("btc_wizard_mana", "100.0", "Limit for total wizard mana pool", FCVAR_NOTIFY, true, 0.0, false, 0.0);
 	g_btc_wizard.m_hCvars[WizardManaRegen] = CreateConVar("btc_wizard_mana_regen", "1.0", "Mana regen rate per second", FCVAR_NOTIFY, true, 0.0, false, 0.0);
@@ -378,6 +380,7 @@ methodmap CWizard < BTCBaseClass
 
 		this.UpdateHUD(g_btc_wizard.m_hHUDs[SpellHUD], "", 0.0, -1.0, 0.5, 0, 255, 0, 255, 2, 0.0, 0.0, 0.0);
 		this.UpdateHUD(g_btc_wizard.m_hHUDs[CoolHUD], "", 0.0, -1.0, 0.5, 0, 255, 0, 255, 2, 0.0, 0.0, 0.0);
+		this.UpdateHUD(g_btc_wizard.m_hHUDs[StatusHUD], "", -1.0, 0.75, 0.5, 255, 255, 255, 255, 2, 0.0, 0.0, 0.0);
 	}
 
 	public void OnDamage(BTCBaseClass victim, Event event) {
@@ -424,6 +427,10 @@ methodmap CWizard < BTCBaseClass
 		char SpellHUDText[255]; // Display of current selected spell
 		char CoolHUDText[255];
 
+		this.fCooldown -= 0.1;
+		if(this.fCooldown < 0.0)
+			this.fCooldown = 0.0;
+
 		this.fFireCooldown -= 0.1;
 		if(this.fFireCooldown < 0.0)
 			this.fFireCooldown = 0.0;
@@ -446,7 +453,7 @@ methodmap CWizard < BTCBaseClass
 		if(this.fMonoCooldown < 0.0)
 			this.fMonoCooldown = 0.0;
 
-		Format(CoolHUDText, sizeof(CoolHUDText), "              (%i) %i\n              (%i) %i\n              (%i) %i\n              (%i) %i\n              (%i) %i\n              (%i) %i\n              (%i) %i\n", this.iFireCharges, RoundToZero(this.fFireCooldown), this.iBatsCharges, RoundToZero(this.fBatsCooldown), this.iUberCharges, RoundToZero(this.fUberCooldown), this.iJumpCharges, RoundToZero(this.fJumpCooldown), this.iInvisCharges, RoundToZero(this.fInvisCooldown), this.iMeteorCharges, RoundToZero(this.fMeteorCooldown), this.iMonoCharges, RoundToZero(this.fMonoCooldown));
+		Format(CoolHUDText, sizeof(CoolHUDText), "              (%i) %i\n              (%i) %i\n              (%i) %i\n              (%i) %i\n              (%i) %i\n              (%i) %i\n              (%i) %i\n", this.iFireCharges, RoundToCeil(this.fFireCooldown), this.iBatsCharges, RoundToCeil(this.fBatsCooldown), this.iUberCharges, RoundToCeil(this.fUberCooldown), this.iJumpCharges, RoundToCeil(this.fJumpCooldown), this.iInvisCharges, RoundToCeil(this.fInvisCooldown), this.iMeteorCharges, RoundToCeil(this.fMeteorCooldown), this.iMonoCharges, RoundToCeil(this.fMonoCooldown));
 		switch(this.iSelectedSpell) {
 			case 1: {
 				Format(SpellHUDText, sizeof(SpellHUDText), ">Fire\n Bats\n Uber\n Jump\n Invis\n Meteor\n Mono\n Mana: %i", RoundToZero(this.fMana));
@@ -561,6 +568,10 @@ methodmap CWizard < BTCBaseClass
 		}
 
 		int iSpellbook = FindSpellBook(this.index);
+
+		this.fAntiSpamCooldown -= 0.1;
+		if(this.fAntiSpamCooldown < 0.0)
+			this.fAntiSpamCooldown = 0.0;
 
 		if((GetClientButtons(this.index) & IN_RELOAD) && this.fAntiSpamCooldown <= 0.0)
 		{
@@ -714,8 +725,12 @@ public void Wizard_OnClassThink(const BTCBaseClass player) {
 }
 
 public Action Wizard_OnClassSpawn(const BTCBaseClass player, Event event) {
-	if(player.GetPropInt("iPresetType") != g_iWizardID)
+	if(player.GetPropInt("iPresetType") != g_iWizardID) {
+		ToCWizard(player).UpdateHUD(g_btc_wizard.m_hHUDs[SpellHUD], "", 0.0, -1.0, 0.5, 0, 255, 0, 255, 2, 0.0, 0.0, 0.0);
+		ToCWizard(player).UpdateHUD(g_btc_wizard.m_hHUDs[CoolHUD], "", 0.0, -1.0, 0.5, 0, 255, 0, 255, 2, 0.0, 0.0, 0.0);
+		ToCWizard(player).UpdateHUD(g_btc_wizard.m_hHUDs[StatusHUD], "", -1.0, 0.75, 0.5, 255, 255, 255, 255, 2, 0.0, 0.0, 0.0);
 		return Plugin_Continue;
+	}
 	player.SetPropInt("iClassType", g_iWizardID);
 	ToCWizard(player).OnSpawn();
 	return Plugin_Handled;
@@ -759,6 +774,11 @@ public Action HookSound(int clients[64], int& numClients, char sound[PLATFORM_MA
 	if(channel==SNDCHAN_VOICE && IsWizard(player))
 		return Plugin_Stop;
 	return Plugin_Continue;
+}
+
+public Action CommandWizardDebug(int iClient, int args) {
+	ReplyToCommand(iClient, "ID: %i", g_iWizardID);
+	return Plugin_Handled;
 }
 
 /// TF2 Events

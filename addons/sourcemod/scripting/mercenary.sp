@@ -53,6 +53,7 @@ enum struct BTCGlobals_Mercenary {
 BTCGlobals_Mercenary g_btc_mercenary;
 
 public void OnPluginStart() {
+	RegConsoleCmd("sm_merc", CommandMercDebug, "Usage: sm_merc");
 	g_btc_mercenary.m_hCvars[MercenaryLimit] = CreateConVar("btc_mercenary_limit", "3", "Limit for amount of mercenaries", FCVAR_NOTIFY, true, 0.0, false, 0.0);
 	g_btc_mercenary.m_hCvars[MercenaryGrenade] = CreateConVar("btc_mercenary_grenade", "2", "Grenade stock limit for mercenaries", FCVAR_NOTIFY, true, 0.0, false, 0.0);
 	g_btc_mercenary.m_hCvars[MercenaryGrenadeRegen] = CreateConVar("btc_mercenary_grenade_regen", "60.0", "Regen interval for grenades for mercenaries", FCVAR_NOTIFY, true, 0.0, false, 0.0);
@@ -193,7 +194,7 @@ methodmap CMercenary < BTCBaseClass
 			return;
 	
 		char GrenadeHUDText[255]; // Display of current amount grenades
-		Format(GrenadeHUDText, sizeof(GrenadeHUDText), "Grenades: %i", this.iGrenadeStock);
+		Format(GrenadeHUDText, sizeof(GrenadeHUDText), "Grenades: %i\nCooldown: %.1f", this.iGrenadeStock, this.fGrenadeCooldown);
 		this.UpdateHUD(g_btc_mercenary.m_hHUDs[GrenadeHUD], GrenadeHUDText, 0.75, 0.85, 0.5, 255, 255, 255, 255, 2, 0.0, 0.0, 0.0);
 
 		char sModel[128];
@@ -205,10 +206,10 @@ methodmap CMercenary < BTCBaseClass
 		}
 
 		this.fGrenadeCooldown -= 0.1;
-		if(this.fGrenadeCooldown > 0.0)
+		if(this.fGrenadeCooldown < 0.0)
 			this.fGrenadeCooldown = 0.0;
 		this.fGrenadeThrowCooldown -= 0.1;
-		if(this.fGrenadeThrowCooldown > 0.0)
+		if(this.fGrenadeThrowCooldown < 0.0)
 			this.fGrenadeThrowCooldown = 0.0;
 
 		if(this.iGrenadeStock < g_btc_mercenary.m_hCvars[MercenaryGrenade].IntValue && this.fGrenadeCooldown <= 0.0) {
@@ -221,9 +222,8 @@ methodmap CMercenary < BTCBaseClass
 		int iGrapplinghook = FindGrapplingHook(this.index);
 		if(!iWeapon || !IsValidEdict(iWeapon)) /// Invalid weapon is equipped/active, we should stop here
 			return;
-		if((GetClientButtons(this.index) & IN_ATTACK2) && this.fGrenadeThrowCooldown <= 0.0 && this.iGrenadeStock > 0)
+		if((GetClientButtons(this.index) & IN_ATTACK2) && this.fGrenadeThrowCooldown <= 0.0)
 		{
-			SDK_PlaySpecificSequence(this.index, "grenade_throw");
 			RequestFrame(GrenadeThrow, this);
 			this.fGrenadeThrowCooldown = 2.5;
 		}
@@ -296,8 +296,10 @@ public void Mercenary_OnClassThink(const BTCBaseClass player) {
 }
 
 public Action Mercenary_OnClassSpawn(const BTCBaseClass player, Event event) {
-	if(player.GetPropInt("iPresetType") != g_iMercID)
+	if(player.GetPropInt("iPresetType") != g_iMercID) {
+		ToCMercenary(player).UpdateHUD(g_btc_mercenary.m_hHUDs[GrenadeHUD], "", 0.75, 0.85, 0.5, 255, 255, 255, 255, 2, 0.0, 0.0, 0.0);
 		return Plugin_Continue;
+	}
 	player.SetPropInt("iClassType", g_iMercID);
 	ToCMercenary(player).OnSpawn();
 	return Plugin_Handled;
@@ -324,9 +326,10 @@ public Action OnItemPickUp(Event event, const char[] eventName, bool dontBroadca
 stock void GrenadeThrow(CMercenary merc) {
 	if(merc.iGrenadeStock <= 0) {
 		EmitSoundToClient(merc.index, NoThrow_Sound, merc.index, _, _, _, 1.0);
+		merc.fGrenadeThrowCooldown = 0.5;
 		return;
 	}
-	
+	SDK_PlaySpecificSequence(merc.index, "grenade_throw");
 	float pos[3], endPos[3], angle[3], vecs[3];
 	GetClientEyePosition(merc.index, pos);
 	GetClientEyeAngles(merc.index, angle);
@@ -586,6 +589,11 @@ public void RemoveParticle(any particle)
 			AcceptEntityInput(particle, "Kill");
 		}
 	}
+}
+
+public Action CommandMercDebug(int iClient, int args) {
+	ReplyToCommand(iClient, "ID: %i", g_iMercID);
+	return Plugin_Handled;
 }
 
 stock void PrecacheParticleSystem(const char[] p_strEffectName)

@@ -3,13 +3,15 @@
 #include <tf2items>
 #include <tf2attributes>
 #include <clientprefs>
+#include <freak_fortress_2>
+#include <freak_fortress_2_subplugin>
 
 #define PLYR           35
 #define PLUGIN_VERSION "0.0.1"
 
 public Plugin myinfo =
 {
-	name = "Be The Class Hub core",
+	name = "Be The Class Hub core (FF2 edition)",
 	author = "TheBluekr",
 	description = "Set the player's class to any of the custom classes!",
 	version = PLUGIN_VERSION,
@@ -230,13 +232,13 @@ public Action OnPlayerHurt(Event event, const char[] name, bool dontBroadcast) {
 public void OnClientPutInServer(int client) {
 	g_btc.m_hPlayerFields[client] = new StringMap();
 	g_btc.m_hPlayerFields[client].SetValue("iPresetType", 0);
-	g_btc.m_hPlayerFields[client].SetValue("iClassType", 0);
 }
 
 public void OnClientDisconnect(int client) {
 	//BaseClass baseplayer = BaseClass(client);
 	g_btc.m_hPlayerFields[client].SetValue("iPresetType", 0);
 	g_btc.m_hPlayerFields[client].SetValue("iClassType", 0);
+	/// Just to prevent limit from glitching out
 }
 
 public void OnMapStart() {
@@ -324,7 +326,7 @@ public int RegisterClass(Handle plugin, const char modulename[MAX_CLASS_NAME_SIZ
 			/// override its plugin ID then, it was probably reloaded.
 			module.plugin = plugin;
 			g_btc.m_hClassesRegistered.SetArray(i, module, sizeof(module));
-			return i;
+			return i + 1;
 		}
 	}
 	
@@ -333,7 +335,7 @@ public int RegisterClass(Handle plugin, const char modulename[MAX_CLASS_NAME_SIZ
 	module.name = modulename;
 	module.plugin = plugin;
 	g_btc.m_hClassesRegistered.PushArray(module, sizeof(module));
-	return g_btc.m_hClassesRegistered.Length;
+	return g_btc.m_hClassesRegistered.Length + 1;
 }
 
 public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max) {
