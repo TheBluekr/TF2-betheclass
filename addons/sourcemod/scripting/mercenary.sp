@@ -140,6 +140,7 @@ methodmap CMercenary < BTCBaseClass
 	}
 	public void OnSpawn()
 	{
+		TF2Attrib_RemoveAll(this.index);
 		TF2_SetPlayerClass(this.index, TFClass_Soldier, _, false);
 		SetBaseSpeed(this.index, 300.0);
 		TF2Attrib_SetByName(this.index, "max health additive penalty", -50.0);
@@ -293,14 +294,15 @@ public void Mercenary_OnClassThink(const BTCBaseClass player) {
 }
 
 public void MercSpawn(BTCBaseClass player) {
-	ToCMercenary(player).OnSpawn();
+	
 }
 
-public void Mercenary_OnClassSpawn(const BTCBaseClass player, Event event) {
+public Action Mercenary_OnClassSpawn(const BTCBaseClass player, Event event) {
 	if(player.GetPropInt("iPresetType") != g_iMercID)
-		return;
+		return Plugin_Continue;
 	player.SetPropInt("iClassType", g_iMercID);
-	SetPawnTimer(MercSpawn, 0.1, player);
+	ToCMercenary(player).OnSpawn();
+	return Plugin_Handled;
 }
 
 public void Mercenary_OnClassDeath(const BTCBaseClass attacker, const BTCBaseClass victim, Event event) {
