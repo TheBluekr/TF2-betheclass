@@ -1,9 +1,17 @@
+#include <sourcemod>
+#include <betheclass>
+#include <tf2attributes>
+#include <tf2>
+#include <tf2_stocks>
+
 // Define sounds
 #define SOUND_RECHARGE			"misc/halloween/spelltick_set.wav"
 #define SOUND_SPELL_RARE		"vo/merasmus/rare_spell.wav"
 
 // Define models
 #define Wizard_Model			"models/ivory/wizards/fix/v2/merasmus.mdl"
+
+#define Sniper_Model			"models/player/sniper.mdl"
 
 public Plugin myinfo = {
 	name = "BTC Wizard subplugin",
@@ -88,17 +96,17 @@ public void OnPluginStart() {
 	for( int i; i<MaxBTCWizardHUDs; i++ )
 		g_btc_wizard.m_hHUDs[i] = CreateHudSynchronizer();
 
-	HookEvent("item_pickup", OnItemPickUp, EventHookMode_Pre);
+	AddCommandListener(OnVoiceMenu, "voicemenu");
+
+	AddNormalSoundHook(HookSound);
 }
 
 methodmap CWizard < BTCBaseClass
 {
-	public CWizard(const int ind, bool uid=false)
-	{
+	public CWizard(const int ind, bool uid=false) {
 		return view_as<CWizard>( BTCBaseClass(ind, uid) );
 	}
-	property float fMana
-	{
+	property float fMana {
 		public get()
 		{
 			return this.GetPropFloat("fMana");
@@ -108,8 +116,7 @@ methodmap CWizard < BTCBaseClass
 			this.SetPropFloat("fMana", val);
 		}
 	}
-	property float fCooldown
-	{
+	property float fCooldown {
 		public get()
 		{
 			return this.GetPropFloat("fCooldown");
@@ -119,8 +126,7 @@ methodmap CWizard < BTCBaseClass
 			this.SetPropFloat("fCooldown", val);
 		}
 	}
-	property float fAntiSpamCooldown
-	{
+	property float fAntiSpamCooldown {
 		public get()
 		{
 			return this.GetPropFloat("fAntiSpamCooldown");
@@ -130,8 +136,7 @@ methodmap CWizard < BTCBaseClass
 			this.SetPropFloat("fAntiSpamCooldown", val);
 		}
 	}
-	property float fFireCooldown
-	{
+	property float fFireCooldown {
 		public get()
 		{
 			return this.GetPropFloat("fFireCooldown");
@@ -141,19 +146,17 @@ methodmap CWizard < BTCBaseClass
 			this.SetPropFloat("fFireCooldown", val);
 		}
 	}
-	property int iFireCharges
-	{
+	property int iFireCharges {
 		public get()
 		{
 			return this.GetPropInt("iFireCharges");
 		}
 		public set(const int val)
 		{
-			this.SetPropFloat("iFireCharges", val);
+			this.SetPropInt("iFireCharges", val);
 		}
 	}
-	property float fBatsCooldown
-	{
+	property float fBatsCooldown {
 		public get()
 		{
 			return this.GetPropFloat("fBatsCooldown");
@@ -163,19 +166,17 @@ methodmap CWizard < BTCBaseClass
 			this.SetPropFloat("fBatsCooldown", val);
 		}
 	}
-	property int iBatsCharges
-	{
+	property int iBatsCharges {
 		public get()
 		{
 			return this.GetPropInt("iBatsCharges");
 		}
 		public set(const int val)
 		{
-			this.SetPropFloat("iBatsCharges", val);
+			this.SetPropInt("iBatsCharges", val);
 		}
 	}
-	property float fUberCooldown
-	{
+	property float fUberCooldown {
 		public get()
 		{
 			return this.GetPropFloat("fUberCooldown");
@@ -185,19 +186,17 @@ methodmap CWizard < BTCBaseClass
 			this.SetPropFloat("fUberCooldown", val);
 		}
 	}
-	property int iUberCharges
-	{
+	property int iUberCharges {
 		public get()
 		{
 			return this.GetPropInt("iUberCharges");
 		}
 		public set(const int val)
 		{
-			this.SetPropFloat("iUberCharges", val);
+			this.SetPropInt("iUberCharges", val);
 		}
 	}
-	property float fJumpCooldown
-	{
+	property float fJumpCooldown {
 		public get()
 		{
 			return this.GetPropFloat("fJumpCooldown");
@@ -207,19 +206,17 @@ methodmap CWizard < BTCBaseClass
 			this.SetPropFloat("fJumpCooldown", val);
 		}
 	}
-	property int iJumpCharges
-	{
+	property int iJumpCharges {
 		public get()
 		{
 			return this.GetPropInt("iJumpCharges");
 		}
 		public set(const int val)
 		{
-			this.SetPropFloat("iJumpCharges", val);
+			this.SetPropInt("iJumpCharges", val);
 		}
 	}
-	property float fInvisCooldown
-	{
+	property float fInvisCooldown {
 		public get()
 		{
 			return this.GetPropFloat("fInvisCooldown");
@@ -229,19 +226,17 @@ methodmap CWizard < BTCBaseClass
 			this.SetPropFloat("fInvisCooldown", val);
 		}
 	}
-	property int iInvisCharges
-	{
+	property int iInvisCharges {
 		public get()
 		{
 			return this.GetPropInt("iInvisCharges");
 		}
 		public set(const int val)
 		{
-			this.SetPropFloat("iInvisCharges", val);
+			this.SetPropInt("iInvisCharges", val);
 		}
 	}
-	property float fMeteorCooldown
-	{
+	property float fMeteorCooldown {
 		public get()
 		{
 			return this.GetPropFloat("fMeteorCooldown");
@@ -251,19 +246,17 @@ methodmap CWizard < BTCBaseClass
 			this.SetPropFloat("fMeteorCooldown", val);
 		}
 	}
-	property int iMeteorCharges
-	{
+	property int iMeteorCharges {
 		public get()
 		{
 			return this.GetPropInt("iMeteorCharges");
 		}
 		public set(const int val)
 		{
-			this.SetPropFloat("iMeteorCharges", val);
+			this.SetPropInt("iMeteorCharges", val);
 		}
 	}
-	property float fMonoCooldown
-	{
+	property float fMonoCooldown {
 		public get()
 		{
 			return this.GetPropFloat("fMonoCooldown");
@@ -273,52 +266,47 @@ methodmap CWizard < BTCBaseClass
 			this.SetPropFloat("fMonoCooldown", val);
 		}
 	}
-	property int iMonoCharges
-	{
+	property int iMonoCharges {
 		public get()
 		{
 			return this.GetPropInt("iMonoCharges");
 		}
 		public set(const int val)
 		{
-			this.SetPropFloat("iMonoCharges", val);
+			this.SetPropInt("iMonoCharges", val);
 		}
 	}
-	property int iSelectedSpell
-	{
+	property int iSelectedSpell {
 		public get()
 		{
 			return this.GetPropInt("iSelectedSpell");
 		}
 		public set(const int val)
 		{
-			this.SetPropFloat("iSelectedSpell", val);
+			this.SetPropInt("iSelectedSpell", val);
 		}
 	}
-	property int iSpelltype
-	{
+	property int iSpelltype {
 		public get()
 		{
 			return this.GetPropInt("iSpelltype");
 		}
 		public set(const int val)
 		{
-			this.SetPropFloat("iSpelltype", val);
+			this.SetPropInt("iSpelltype", val);
 		}
 	}
-	property int iCastSound
-	{
+	property int iCastSound {
 		public get()
 		{
 			return this.GetPropInt("iCastSound");
 		}
 		public set(const int val)
 		{
-			this.SetPropFloat("iCastSound", val);
+			this.SetPropInt("iCastSound", val);
 		}
 	}
-	property float fInvisBonus
-	{
+	property float fInvisBonus {
 		public get()
 		{
 			return this.GetPropFloat("fInvisBonus");
@@ -328,41 +316,22 @@ methodmap CWizard < BTCBaseClass
 			this.SetPropFloat("fInvisBonus", val);
 		}
 	}
-
-	public void Init()
-	{
-		this.fMana = 0.0;
-		this.fCooldown = 0.0;
-		this.fAntiSpamCooldown = 0.0;
-		this.fFireCooldown = 0.0;
-		this.fBatsCooldown = 0.0;
-		this.fUberCooldown = 0.0;
-		this.fJumpCooldown = 0.0;
-		this.fInvisCooldown = 0.0;
-		this.fMeteorCooldown = 0.0;
-		this.fMonoCooldown = 0.0;
-		//SpellCharges
-		this.iFireCharges = 0; //Fire
-		this.iBatsCharges = 0; //Bats
-		this.iUberCharges = 0; //Uber
-		this.iJumpCharges = 0; //Jump
-		this.iInvisCharges = 0; //Invis
-		this.iMeteorCharges = 0; //Meteor
-		this.iMonoCharges = 0; //Mono
-		//Others
-		this.iSelectedSpell = 1;
-		this.iCastSound = 0;
-		this.iSpelltype = 0;
-		this.fInvisBonus = 0.0;
+	public void UpdateHUD(Handle hHUD, const char[] text, float x, float y, float holdTime, int r, int g, int b, int a, int effect, float fxTime, float fadeIn, float fadeOut) {
+		SetHudTextParams(x, y, holdTime, r, g, b, a, effect, fxTime, fadeIn, fadeOut);
+		ShowSyncHudText(this.index, hHUD, text);
 	}
-
-	public void OnSpawn()
-	{
+	public bool IsReady() {
+		if(TF2_IsPlayerInCondition(this.index, TFCond_Cloaked) || TF2_IsPlayerInCondition(this.index, TFCond_Dazed) || TF2_IsPlayerInCondition(this.index, TFCond_Taunting) || TF2_IsPlayerInCondition(this.index, TFCond_Bonked) || TF2_IsPlayerInCondition(this.index, TFCond_RestrictToMelee) || TF2_IsPlayerInCondition(this.index, TFCond_MeleeOnly) || TF2_IsPlayerInCondition(this.index, TFCond_HalloweenGhostMode) || TF2_IsPlayerInCondition(this.index, TFCond_HalloweenKart))
+			return false;
+		return true;
+	}
+	public void OnSpawn() {
+		TF2Attrib_RemoveAll(this.index);
 		TF2_SetPlayerClass(this.index, TFClass_Sniper, _, true);
 		TF2Attrib_SetByName(this.index, "max health additive bonus", 25.0);
 		SetEntityHealth(this.index, 200); // Just in case
 
-		this.RemoveAllItems();
+		this.RemoveAllItems(true);
 
 		//Cooldowns
 		this.fCooldown = 1.0; // 1s
@@ -398,32 +367,23 @@ methodmap CWizard < BTCBaseClass
 		this.SpawnWeapon("tf_weapon_spellbook", 1070, 1, 0, "124 ; 1 ; 547 ; 0.5")
 	}
 
-	public void OnDeath(BaseClass attacker, BaseClass victim, Event event) {
+	public void OnKill(BTCBaseClass victim, Event event) {
+	}
+	public void OnDeath(BTCBaseClass attacker, Event event) {
 		float victimpos[3];
-		if (IsClientHere(attacker.index))
-		{
-			if(IsPlayerAlive(attacker.index) && victim.index != attacker.index && IsClientHere(victim.index))
-			{
-				GetClientAbsOrigin(victim.index, victimpos);
-				char killSound[35];
-				Format(killSound, sizeof(killSound), "vo/halloween_merasmus/sf12_combat_idle0%i.mp3", GetRandomInt(1, 2));
-				EmitSoundToAll(killSound, attacker.index, _, _, _, 0.5, _, _, victimpos, _, false);
-				// Begin cleaning the HUD handles
-				this.UpdateHUD(victim.index, SpellHUD, "", 0.0, -1.0, 0.5, 0, 255, 0, 255, 2, 0.0, 0.0, 0.0);
-				this.UpdateHUD(victim.index, CoolHUD, "", 0.0, -1.0, 0.5, 0, 255, 0, 255, 2, 0.0, 0.0, 0.0);
-			}
-		}
+		GetClientAbsOrigin(this.index, victimpos);
+		char killSound[35];
+		Format(killSound, sizeof(killSound), "vo/halloween_merasmus/sf12_combat_idle0%i.mp3", GetRandomInt(1, 2));
+		EmitSoundToAll(killSound, this.index, _, _, _, 0.5, _, _, victimpos, _, false);
+
+		this.UpdateHUD(g_btc_wizard.m_hHUDs[SpellHUD], "", 0.0, -1.0, 0.5, 0, 255, 0, 255, 2, 0.0, 0.0, 0.0);
+		this.UpdateHUD(g_btc_wizard.m_hHUDs[CoolHUD], "", 0.0, -1.0, 0.5, 0, 255, 0, 255, 2, 0.0, 0.0, 0.0);
 	}
 
-	public void OnKill(BaseClass attacker, BaseClass victim, Event event)
-	{
-	}
-
-	public void OnDamage(BaseClass attacker, BaseClass victim, Event event)
-	{
-		if(attacker.index == victim.index)
+	public void OnDamage(BTCBaseClass victim, Event event) {
+		if(this.index == victim.index)
 			return;
-		if(attacker.index == this.index && GetEntPropEnt(attacker.index, Prop_Send, "m_hActiveWeapon") == GetPlayerWeaponSlot(attacker.index, TFWeaponSlot_Melee) && event.GetInt("custom") == 0 /* Spells should have a custom value */ ) {
+		if(GetEntPropEnt(this.index, Prop_Send, "m_hActiveWeapon") == GetPlayerWeaponSlot(this.index, TFWeaponSlot_Melee) && event.GetInt("custom") == 0 /* Spells should have a custom value */ ) {
 			this.fMana += g_btc_wizard.m_hCvars[WizardManaOnHit].FloatValue; // Award 10 mana on melee hit
 			if(this.fInvisBonus > 0.0) {
 				this.fMana += g_btc_wizard.m_hCvars[WizardInvisBonus].FloatValue;
@@ -431,19 +391,17 @@ methodmap CWizard < BTCBaseClass
 		}
 	}
 
-	public void OnHurt(BaseClass attacker, BaseClass victim, Event event)
-	{
+	public void OnHurt(BTCBaseClass attacker, Event event) {
 		if(event.GetInt("health") > 0 && event.GetInt("damageamount") > 0) {
 			float fWizardPos[3];
 			char medSound[35];
-			GetClientAbsOrigin(victim.index, fWizardPos);
+			GetClientAbsOrigin(this.index, fWizardPos);
 			Format(medSound, sizeof(medSound), "vo/merasmus/sf12_pain0%i.mp3", GetRandomInt(1, 6));
-			EmitSoundToAll(medSound, victim.index, _, _, _, 0.3, _, _, fWizardPos, _, false);
+			EmitSoundToAll(medSound, this.index, _, _, _, 0.3, _, _, fWizardPos, _, false);
 		}
 	}
 
-	public void OnVoiceMenu(const char[] szCmd1, const char[] szCmd2)
-	{
+	public void OnVoiceMenu(const char[] szCmd1, const char[] szCmd2) {
 		if(szCmd1[0] == '0' && szCmd2[0] == '0' && this.fAntiSpamCooldown <= 0.0) // Medic call
 		{
 			if(this.iSelectedSpell <= 1)
@@ -454,13 +412,14 @@ methodmap CWizard < BTCBaseClass
 		}
 	}
 
-	public void Think()
-	{
-		if(TF2_IsPlayerInCondition(this.index, view_as<TFCond>(50)) || TF2_IsPlayerInCondition(this.index, view_as<TFCond>(15))) { // Sapped or scared
-			this.UpdateHUD(this.index, StatusHUD, "Your magic is being jammed! Run Away!", -1.0, 0.75, 0.5, 255, 255, 255, 255, 2, 0.0, 0.0, 0.0);
-		}
+	public void Think() {
+		if(!IsValidClient(this.index, true))
+			return;
+		
+		if(TF2_IsPlayerInCondition(this.index, view_as<TFCond>(50)))
+			this.UpdateHUD(g_btc_wizard.m_hHUDs[StatusHUD], "Your magic is being jammed! Run Away!", -1.0, 0.75, 0.5, 255, 255, 255, 255, 2, 0.0, 0.0, 0.0);
 		else
-			this.UpdateHUD(this.index, StatusHUD, "", -1.0, 0.75, 0.5, 255, 255, 255, 255, 2, 0.0, 0.0, 0.0);
+			this.UpdateHUD(g_btc_wizard.m_hHUDs[StatusHUD], "", -1.0, 0.75, 0.5, 255, 255, 255, 255, 2, 0.0, 0.0, 0.0);
 		
 		char SpellHUDText[255]; // Display of current selected spell
 		char CoolHUDText[255];
@@ -525,11 +484,9 @@ methodmap CWizard < BTCBaseClass
 				this.iCastSound = 9;
 			}
 		}
-		if(IsClientAlive(this.index))
-		{
-			this.UpdateHUD(this.index, SpellHUD, SpellHUDText, 0.0, -1.0, 0.5, 0, 255, 0, 255, 2, 0.0, 0.0, 0.0);
-			this.UpdateHUD(this.index, CoolHUD, CoolHUDText, 0.0, -1.0, 0.5, 0, 255, 0, 255, 2, 0.0, 0.0, 0.0);
-		}
+
+		this.UpdateHUD(g_btc_wizard.m_hHUDs[SpellHUD], SpellHUDText, 0.0, -1.0, 0.5, 0, 255, 0, 255, 2, 0.0, 0.0, 0.0);
+		this.UpdateHUD(g_btc_wizard.m_hHUDs[CoolHUD], CoolHUDText, 0.0, -1.0, 0.5, 0, 255, 0, 255, 2, 0.0, 0.0, 0.0);
 		
 		char sModel[128];
 		GetEntPropString(this.index, Prop_Data, "m_ModelName", sModel, sizeof(sModel)); // Get the complete Modelname.
@@ -682,8 +639,8 @@ methodmap CWizard < BTCBaseClass
 			SetPawnTimer(ResetSpellCharges, 0.5, this.index);
 		}
 	}
-	public void OnConditionAdded(TFCond condition)
-	{
+
+	public void OnConditionAdded(TFCond condition) {
 		switch( condition ) {
 			case TFCond_Dazed: {
 				float fWizardPos[3];
@@ -694,15 +651,88 @@ methodmap CWizard < BTCBaseClass
 			}
 		}
 	}
-	public void Jam(float duration) {
-		TF2_AddCondition(this.index, view_as<TFCond>(50), duration);
-		//PrintHintText(this.index, "Your magic is being jammed! Run Away!");
+}
+
+public CWizard ToCWizard(const BTCBaseClass guy) {
+	return view_as<CWizard>(guy);
+}
+
+int g_iWizardID;
+
+public void OnLibraryAdded(const char[] name) {
+	if( StrEqual(name, "BeTheClass") ) {
+		g_iWizardID = BTC_RegisterPlugin("wizard");
+		LoadBTCHooks();
 	}
 }
 
-public CWizard ToCWizard(const BaseClass guy)
-{
-	return view_as<CWizard>(guy);
+public void LoadBTCHooks() {
+	if(!BTC_HookEx(OnCallDownload, Wizard_OnCallDownloads))
+		LogError("Error loading OnCallDownload forwards for Wizard subplugin.");
+	if(!BTC_HookEx(OnClassThink, Wizard_OnClassThink))
+		LogError("Error loading OnClassThink forwards for Wizard subplugin.");
+	if(!BTC_HookEx(OnClassSpawn, Wizard_OnClassSpawn))
+		LogError("Error loading OnClassSpawn forwards for Wizard subplugin.");
+	if(!BTC_HookEx(OnClassDeath, Wizard_OnClassDeath))
+		LogError("Error loading OnClassDeath forwards for Wizard subplugin.");
+	if(!BTC_HookEx(OnClassHurt, Wizard_OnClassHurt))
+		LogError("Error loading OnClassHurt forwards for Wizard subplugin.");
+	if(!BTC_HookEx(OnClassMenu, Wizard_OnClassMenu))
+		LogError("Error loading OnClassMenu forwards for Wizard subplugin.");
+}
+
+
+stock bool IsWizard(const BTCBaseClass player) {
+	return player.GetPropInt("iClassType") == g_iWizardID;
+}
+
+public void OnRoundStart(Event event, const char[] name, bool dontBroadcast) {
+	BTCBaseClass player = BTCBaseClass(GetEventInt(event,"userid"), true);
+	if(!IsValidClient(player.index) || !IsWizard(player)) {
+		return;
+	}
+	float fWizardPos[3];
+	GetClientAbsOrigin(player.index, fWizardPos);
+	char medSound[35];
+	Format(medSound, sizeof(medSound), "vo/merasmus/round_begin0%i.mp3", GetRandomInt(1, 4));
+	EmitSoundToAll(medSound, player.index, _, _, _, 0.5, _, _, fWizardPos, _, false);
+}
+
+public void Wizard_OnCallDownloads() {
+	PrecacheModel(Wizard_Model, true);
+}
+
+public void Wizard_OnClassMenu(Menu &menu) {
+	char tostr[10]; IntToString(g_iWizardID, tostr, sizeof(tostr));
+	menu.AddItem(tostr, "Wizard");
+}
+
+public void Wizard_OnClassThink(const BTCBaseClass player) {
+	if(!IsWizard(player))
+		return;
+	ToCWizard(player).Think();
+}
+
+public Action Wizard_OnClassSpawn(const BTCBaseClass player, Event event) {
+	if(player.GetPropInt("iPresetType") != g_iWizardID)
+		return Plugin_Continue;
+	player.SetPropInt("iClassType", g_iWizardID);
+	ToCWizard(player).OnSpawn();
+	return Plugin_Handled;
+}
+
+public void Wizard_OnClassDeath(const BTCBaseClass attacker, const BTCBaseClass victim, Event event) {
+	if(IsWizard(attacker))
+		ToCWizard(attacker).OnKill(victim, event);
+	else if (IsWizard(victim))
+		ToCWizard(victim).OnDeath(attacker, event);
+}
+
+public void Wizard_OnClassHurt(const BTCBaseClass attacker, const BTCBaseClass victim, Event event) {
+	if(IsWizard(attacker))
+		ToCWizard(attacker).OnDamage(victim, event);
+	else if (IsWizard(victim))
+		ToCWizard(victim).OnHurt(attacker, event);
 }
 
 public void ResetSpellCharges(int iClient) {
@@ -710,6 +740,68 @@ public void ResetSpellCharges(int iClient) {
 	SetEntProp(iSpellbook, Prop_Send, "m_iSpellCharges", 0);
 }
 
-public void AddWizardToDownloads() {
-	PrecacheModel(Wizard_Model, true);
+public Action OnVoiceMenu(int iClient, const char[] command, int argc) {
+	if(!IsValidClient(iClient) || argc < 2)
+		return Plugin_Continue;
+	BTCBaseClass player = BTCBaseClass(iClient)
+	if(!IsWizard(player))
+		return Plugin_Continue;
+	char szCmd1[8]; GetCmdArg(1, szCmd1, sizeof(szCmd1));
+	char szCmd2[8]; GetCmdArg(2, szCmd2, sizeof(szCmd2));
+	ToCWizard(player).OnVoiceMenu(szCmd1, szCmd2);
+	return Plugin_Handled;
+}
+
+public Action HookSound(int clients[64], int& numClients, char sound[PLATFORM_MAX_PATH], int& entity, int& channel, float& volume, int& level, int& pitch, int& flags, char soundEntry[PLATFORM_MAX_PATH], int& seed) {
+	if(!IsValidClient(entity) || channel < 1)
+		return Plugin_Continue;
+	BTCBaseClass player = BTCBaseClass(entity);
+	if(channel==SNDCHAN_VOICE && IsWizard(player))
+		return Plugin_Stop;
+	return Plugin_Continue;
+}
+
+/// Stocks
+stock bool IsValidClient(int clientIdx, bool isPlayerAlive=false) {
+	if (clientIdx <= 0 || clientIdx > MaxClients) return false;
+	if(isPlayerAlive) return IsClientInGame(clientIdx) && IsPlayerAlive(clientIdx);
+	return IsClientInGame(clientIdx);
+}
+
+stock void SetPawnTimer(Function func, float thinktime = 0.1, any param1 = -999, any param2 = -999) {
+	DataPack thinkpack = new DataPack();
+	thinkpack.WriteFunction(func);
+	thinkpack.WriteCell(param1);
+	thinkpack.WriteCell(param2);
+
+	CreateTimer(thinktime, DoThink, thinkpack, TIMER_DATA_HNDL_CLOSE);
+}
+
+public Action DoThink(Handle hTimer, DataPack hndl) {
+	hndl.Reset();
+
+	Function pFunc = hndl.ReadFunction();
+	Call_StartFunction( null, pFunc );
+
+	any param1 = hndl.ReadCell();
+	if ( param1 != -999 )
+		Call_PushCell(param1);
+
+	any param2 = hndl.ReadCell();
+	if ( param2 != -999 )
+		Call_PushCell(param2);
+
+	Call_Finish();
+	return Plugin_Continue;
+}
+
+stock int FindSpellBook(int iClient) {
+	int spellbook = -1;
+	while ((spellbook = FindEntityByClassname(spellbook, "tf_weapon_spellbook")) != -1)
+	{
+		if (IsValidEntity(spellbook) && GetEntPropEnt(spellbook, Prop_Send, "m_hOwnerEntity") == iClient)
+			if(!GetEntProp(spellbook, Prop_Send, "m_bDisguiseWeapon"))
+				return spellbook;
+	}
+	return -1;
 }

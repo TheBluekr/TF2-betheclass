@@ -1,4 +1,5 @@
 /** Disclaimer, majority of the code here is re-used code from Vee's BeTheMerc and Grenade plugin. Credits to her for providing a huge base for this rewritten version. **/
+/** And rewritten by TheBluekr (again) **/
 
 #include <sourcemod>
 #include <betheclass>
@@ -188,11 +189,12 @@ methodmap CMercenary < BTCBaseClass
 	}
 	public void Think()
 	{
-		if(IsClientAlive(this.index)) {
-			char GrenadeHUDText[255]; // Display of current amount grenades
-			Format(GrenadeHUDText, sizeof(GrenadeHUDText), "Grenades: %i", this.iGrenadeStock);
-			this.UpdateHUD(g_btc_mercenary.m_hHUDs[GrenadeHUD], GrenadeHUDText, 0.75, 0.85, 0.5, 255, 255, 255, 255, 2, 0.0, 0.0, 0.0);
-		}
+		if(!IsClientAlive(this.index))
+			return;
+	
+		char GrenadeHUDText[255]; // Display of current amount grenades
+		Format(GrenadeHUDText, sizeof(GrenadeHUDText), "Grenades: %i", this.iGrenadeStock);
+		this.UpdateHUD(g_btc_mercenary.m_hHUDs[GrenadeHUD], GrenadeHUDText, 0.75, 0.85, 0.5, 255, 255, 255, 255, 2, 0.0, 0.0, 0.0);
 
 		char sModel[128];
 		GetEntPropString(this.index, Prop_Data, "m_ModelName", sModel, sizeof(sModel)); // Get the complete Modelname.
@@ -202,10 +204,12 @@ methodmap CMercenary < BTCBaseClass
 			SetEntProp(this.index, Prop_Send, "m_bUseClassAnimations", 1);
 		}
 
+		this.fGrenadeCooldown -= 0.1;
 		if(this.fGrenadeCooldown > 0.0)
-			this.fGrenadeCooldown -= 0.1;
+			this.fGrenadeCooldown = 0.0;
+		this.fGrenadeThrowCooldown -= 0.1;
 		if(this.fGrenadeThrowCooldown > 0.0)
-			this.fGrenadeThrowCooldown -= 0.1;
+			this.fGrenadeThrowCooldown = 0.0;
 
 		if(this.iGrenadeStock < g_btc_mercenary.m_hCvars[MercenaryGrenade].IntValue && this.fGrenadeCooldown <= 0.0) {
 			this.iGrenadeStock++;
@@ -254,8 +258,6 @@ public void LoadBTCHooks()
 		LogError("Error loading OnClassSpawn forwards for Mercenary subplugin.");
 	if(!BTC_HookEx(OnClassDeath, Mercenary_OnClassDeath))
 		LogError("Error loading OnClassDeath forwards for Mercenary subplugin.");
-	if(!BTC_HookEx(OnClassResupply, Mercenary_OnClassResupply))
-		LogError("Error loading OnClassResupply forwards for Mercenary subplugin.");
 	if(!BTC_HookEx(OnClassMenu, Mercenary_OnClassMenu))
 		LogError("Error loading OnClassMenu forwards for Mercenary subplugin.");
 }
@@ -293,10 +295,6 @@ public void Mercenary_OnClassThink(const BTCBaseClass player) {
 	ToCMercenary(player).Think();
 }
 
-public void MercSpawn(BTCBaseClass player) {
-	
-}
-
 public Action Mercenary_OnClassSpawn(const BTCBaseClass player, Event event) {
 	if(player.GetPropInt("iPresetType") != g_iMercID)
 		return Plugin_Continue;
@@ -310,12 +308,6 @@ public void Mercenary_OnClassDeath(const BTCBaseClass attacker, const BTCBaseCla
 		ToCMercenary(attacker).OnKill(victim, event);
 	else if (IsMercenary(victim))
 		ToCMercenary(victim).OnDeath(attacker, event);
-}
-
-public void Mercenary_OnClassResupply(const BTCBaseClass player, Event event) {
-	if(!IsMercenary(player))
-		return;
-	ToCMercenary(player).OnSpawn();
 }
 
 public Action OnItemPickUp(Event event, const char[] eventName, bool dontBroadcast)
