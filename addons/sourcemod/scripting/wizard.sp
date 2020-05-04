@@ -762,19 +762,21 @@ public Action HookSound(int clients[64], int& numClients, char sound[PLATFORM_MA
 }
 
 /// TF2 Events
-public void TF2_OnConditionAdded(int iClient, TFCond condition)
-{
+public void TF2_OnConditionAdded(int iClient, TFCond condition) {
+	if(!IsValidClient(iClient))
+		return;
 	BTCBaseClass player = BTCBaseClass(iClient);
 	if(!IsWizard(player))
 		return;
 	ToCWizard(player).OnConditionAdded(condition);
 }
-public void TF2_OnConditionRemoved(int iClient, TFCond condition)
-{
+public void TF2_OnConditionRemoved(int iClient, TFCond condition) {
+	if(!IsValidClient(iClient))
+		return;
 	BTCBaseClass player = BTCBaseClass(iClient);
 	if(!IsWizard(player))
 		return;
-	if(condition == TFCond_Stealthed) {
+	if(condition == TFCond_Stealthed)
 		ToCWizard(player).fInvisBonus = 0.8;
 }
 
