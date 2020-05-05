@@ -102,7 +102,9 @@ typeset BTCHookCB {
 	function void (Menu& menu);
 };
 
-/// Only use this to get ID's of custom classes presently loaded, core will forward the menu to the subplugins
+native StringMap BTC_GetClassIDs();
+
+/// Only use this to get ID's of custom classes presently loaded for user interactions, core will forward the menu to the subplugins
 native void BTC_ClassMenu(Menu menu);
 
 /// Use hooktype enum on these.

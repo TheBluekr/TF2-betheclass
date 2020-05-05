@@ -333,6 +333,7 @@ public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max
 	CreateNative("BTC_RegisterPlugin", Native_RegisterClass);
 
 	CreateNative("BTC_ClassMenu", Native_ClassMenu);
+	CreateNative("BTC_GetClassIDs", Native_GetClassIDs);
 
 	CreateNative("BTC_Hook", Native_Hook);
 	CreateNative("BTC_HookEx", Native_HookEx);
@@ -370,6 +371,18 @@ public int Native_ClassMenu(Handle plugin, int numParams) {
 	Call_StartForward(g_btc.m_hForwards[OnClassMenu]);
 	Call_PushCellRef(menu);
 	Call_Finish();
+}
+
+public any Native_GetClassIDs(Handle plugin, int numParams) {
+	StringMap class_map = new StringMap();
+	for(int i; i < g_btc.m_hClassesRegistered.Length; i++) {
+		ClassModule class_plugin;
+		g_btc.m_hClassesRegistered.GetArray(i, class_plugin, sizeof(class_plugin));
+		class_map.SetValue(class_plugin.name, i);
+	}
+	if(!class_map.Size)
+		delete class_map;
+	return class_map;
 }
 
 public any Native_BTC_Instance(Handle plugin, int numParams) {
@@ -493,13 +506,4 @@ stock bool IsValidClient(int clientIdx, bool isPlayerAlive=false) {
 
 stock int GetOwner(const int ent) {
 	return( IsValidEntity(ent) ) ? GetEntPropEnt(ent, Prop_Send, "m_hOwnerEntity") : -1;
-}
-
-stock void SetPawnTimer(Function func, float thinktime = 0.1, any param1 = -999, any param2 = -999)
-{
-	DataPack thinkpack = new DataPack();
-	thinkpack.WriteFunction(func);
-	thinkpack.WriteCell(param1);
-	thinkpack.WriteCell(param2);
-	CreateTimer(thinktime, DoThink, thinkpack, TIMER_DATA_HNDL_CLOSE);
 }
