@@ -690,6 +690,8 @@ public void LoadBTCHooks() {
 		LogError("Error loading OnClassHurt forwards for Wizard subplugin.");
 	if(!BTC_HookEx(OnClassMenu, Wizard_OnClassMenu))
 		LogError("Error loading OnClassMenu forwards for Wizard subplugin.");
+	if(!BTC_HookEx(OnClassResupply, Wizard_OnClassResupply))
+		LogError("Error loading OnClassResupply forwards for Wizard subplugin.");
 }
 
 
@@ -748,6 +750,13 @@ public void Wizard_OnClassHurt(const BTCBaseClass attacker, const BTCBaseClass v
 		ToCWizard(attacker).OnDamage(victim, event);
 	else if (IsWizard(victim))
 		ToCWizard(victim).OnHurt(attacker, event);
+}
+
+public Action Wizard_OnClassResupply(const BTCBaseClass player, Event event) {
+	if(!IsWizard(player))
+		return Plugin_Continue;
+	ToCWizard(player).OnSpawn();
+	return Plugin_Handled;
 }
 
 public void ResetSpellCharges(int iClient) {

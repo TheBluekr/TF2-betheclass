@@ -155,6 +155,9 @@ public void OnPluginStart() {
 	HookEvent("player_hurt", OnPlayerHurt, EventHookMode_Pre);
 	HookEvent("post_inventory_application", OnResupply, EventHookMode_Pre);
 
+	AddCommandListener(OnJoinClass, "joinclass");
+	AddCommandListener(OnJoinClass, "join_class");
+
 	g_btc.m_hForwards[OnCallDownload] = new PrivateForward(ET_Event);
 	g_btc.m_hForwards[OnClassThink] = new PrivateForward(ET_Event, Param_Cell);
 	g_btc.m_hForwards[OnClassSpawn] = new PrivateForward(ET_Event, Param_Cell, Param_Cell);
@@ -172,6 +175,8 @@ public Action OnSpawn(Event event, const char[] name, bool dontBroadcast) {
 	if( player && IsClientInGame(player.index) ) {
 		SetVariantString(""); AcceptEntityInput(player.index, "SetCustomModel");
 		player.SetOverlay("0");
+
+		SetEntProp(player.index, Prop_Send, "m_iDesiredPlayerClass", 10);
 		
 		Action act;
 		Call_StartForward(g_btc.m_hForwards[OnClassSpawn]);
@@ -181,6 +186,8 @@ public Action OnSpawn(Event event, const char[] name, bool dontBroadcast) {
 
 		if(act > Plugin_Changed)
 			return Plugin_Continue;
+
+		SetEntProp(player.index, Prop_Send, "m_iDesiredPlayerClass", event.GetInt("class"));
 
 		TF2Attrib_RemoveAll(player.index);
 		TF2_RegeneratePlayer(player.index);
@@ -307,15 +314,25 @@ public void CreateClassMenu(int iClient) {
 
 public int MenuHandler_PickClass(Menu menu, MenuAction action, int param1, int param2) {
 	if(action == MenuAction_Select) {
-		BaseClass baseplayer = BaseClass(param1); /// Param1 is always the client in this case
+		BaseClass player = BaseClass(param1); /// Param1 is always the client in this case
 		char selection[16];
 		menu.GetItem(param2, selection, sizeof(selection));
-		baseplayer.iPresetType = StringToInt(selection);
-		PrintToChat(baseplayer.index, "\x01\x070066BB[BeTheClass]\x01 Selection set.");
+		player.iPresetType = StringToInt(selection);
+		PrintToChat(player.index, "\x01\x070066BB[BeTheClass]\x01 Selection set.");
 	}
 	else if(action == MenuAction_End) {
 		delete menu;
 	}
+}
+
+public Action OnJoinClass(int client, const char[] command, int argc)
+{
+	BaseClass player = BaseClass(client);
+	if(player.iPresetType > 0) {
+		player.iPresetType = 0;
+		PrintToChat(player.index, "\x01\x070066BB[BeTheClass]\x01 Reset selection due to class change.");
+	}
+	return Plugin_Continue;
 }
 
 /// Shamelessly using this from VSH2, nice code Assyrianic

@@ -260,6 +260,8 @@ public void LoadBTCHooks()
 		LogError("Error loading OnClassDeath forwards for Mercenary subplugin.");
 	if(!BTC_HookEx(OnClassMenu, Mercenary_OnClassMenu))
 		LogError("Error loading OnClassMenu forwards for Mercenary subplugin.");
+	if(!BTC_HookEx(OnClassResupply, Mercenary_OnClassResupply))
+		LogError("Error loading OnClassResupply forwards for Mercenary subplugin.");
 }
 
 
@@ -310,6 +312,13 @@ public void Mercenary_OnClassDeath(const BTCBaseClass attacker, const BTCBaseCla
 		ToCMercenary(attacker).OnKill(victim, event);
 	else if (IsMercenary(victim))
 		ToCMercenary(victim).OnDeath(attacker, event);
+}
+
+public Action Mercenary_OnClassResupply(const BTCBaseClass player, Event event) {
+	if(!IsMercenary(player))
+		return Plugin_Continue;
+	ToCMercenary(player).OnSpawn();
+	return Plugin_Handled;
 }
 
 public Action OnItemPickUp(Event event, const char[] eventName, bool dontBroadcast)
