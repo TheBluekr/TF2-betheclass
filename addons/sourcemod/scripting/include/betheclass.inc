@@ -102,6 +102,9 @@ typeset BTCHookCB {
 	function void (Menu& menu);
 };
 
+/// Only use this to get ID's of custom classes presently loaded, core will forward the menu to the subplugins
+native void BTC_ClassMenu(Menu menu);
+
 /// Use hooktype enum on these.
 native void BTC_Hook(const int callbacktype, BTCHookCB callback);
 native bool BTC_HookEx(const int callbacktype, BTCHookCB callback);
@@ -145,6 +148,7 @@ public __pl_betheclass_SetNTVOptional()
 	MarkNativeAsOptional("BTCBaseClass.RemoveAllItems");
 	MarkNativeAsOptional("BTCBaseClass.SpawnWeapon");
 
+	MarkNativeAsOptional("BTC_ClassMenu");
 
 	MarkNativeAsOptional("BTC_Hook");
 	MarkNativeAsOptional("BTC_HookEx");

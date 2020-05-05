@@ -153,6 +153,7 @@ public void OnPluginStart() {
 	HookEvent("player_spawn", OnSpawn);
 	HookEvent("player_death", OnPlayerDeath, EventHookMode_Pre);
 	HookEvent("player_hurt", OnPlayerHurt, EventHookMode_Pre);
+	HookEvent("post_inventory_application", OnResupply, EventHookMode_Pre);
 
 	g_btc.m_hForwards[OnCallDownload] = new PrivateForward(ET_Event);
 	g_btc.m_hForwards[OnClassThink] = new PrivateForward(ET_Event, Param_Cell);
@@ -206,10 +207,10 @@ public Action OnPlayerDeath(Event event, const char[] name, bool dontBroadcast) 
 }
 
 public Action OnPlayerHurt(Event event, const char[] name, bool dontBroadcast) {
-	BaseClass victim = BaseClass( event.GetInt("userid"), true );
+	BaseClass victim = BaseClass(event.GetInt("userid"), true);
 	
 	/// make sure the attacker is valid so we can set him/her as BaseClass instance
-	int attacker = GetClientOfUserId( event.GetInt("attacker") );
+	int attacker = GetClientOfUserId(event.GetInt("attacker"));
 	if( victim.index == attacker || attacker <= 0 )
 		return Plugin_Continue;
 	
@@ -223,6 +224,22 @@ public Action OnPlayerHurt(Event event, const char[] name, bool dontBroadcast) {
 	Call_Finish(act);
 	if(act > Plugin_Changed) {
 		return Plugin_Continue;
+	}
+	return Plugin_Continue;
+}
+
+public Action OnResupply(Event event, const char[] name, bool dontBroadcast) {
+	BaseClass player = BaseClass(event.GetInt("userid"), true);
+	if(!IsValidClient(player.index, true))
+		return Plugin_Continue;
+	
+	Action act;
+	Call_StartForward(g_btc.m_hForwards[OnClassResupply]);
+	Call_PushCell(player);
+	Call_PushCell(event);
+	Call_Finish(act);
+	if(act > Plugin_Continue) {
+		return act;
 	}
 	return Plugin_Continue;
 }
@@ -339,6 +356,8 @@ public int RegisterClass(Handle plugin, const char modulename[MAX_CLASS_NAME_SIZ
 public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max) {
 	CreateNative("BTC_RegisterPlugin", Native_RegisterClass);
 
+	CreateNative("BTC_ClassMenu", Native_ClassMenu);
+
 	CreateNative("BTC_Hook", Native_Hook);
 	CreateNative("BTC_HookEx", Native_HookEx);
 	
@@ -368,6 +387,13 @@ public int Native_RegisterClass(Handle plugin, int numParams) {
 	char module_name[MAX_CLASS_NAME_SIZE]; GetNativeString(1, module_name, sizeof(module_name));
 	/// ALL PROPS TO COOKIES.NET AKA COOKIES.IO
 	return RegisterClass(plugin, module_name);
+}
+
+public int Native_ClassMenu(Handle plugin, int numParams) {
+	Menu menu = GetNativeCell(1);
+	Call_StartForward(g_btc.m_hForwards[OnClassMenu]);
+	Call_PushCellRef(menu);
+	Call_Finish();
 }
 
 public any Native_BTC_Instance(Handle plugin, int numParams) {
