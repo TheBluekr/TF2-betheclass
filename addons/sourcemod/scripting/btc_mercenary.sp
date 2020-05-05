@@ -146,7 +146,7 @@ methodmap CMercenary < BTCBaseClass
 		TF2_SetPlayerClass(this.index, TFClass_Soldier, _, false);
 		SetBaseSpeed(this.index, 300.0);
 		TF2Attrib_SetByName(this.index, "max health additive penalty", -50.0);
-		SetEntityHealth(this.index, 175);
+		SetEntityHealth(this.index, GetEntProp(this.index, Prop_Data, "m_iMaxHealth"));
 
 		this.RemoveAllItems(true);
 

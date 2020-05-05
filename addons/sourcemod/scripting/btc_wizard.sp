@@ -331,7 +331,7 @@ methodmap CWizard < BTCBaseClass
 		TF2Attrib_RemoveAll(this.index);
 		TF2_SetPlayerClass(this.index, TFClass_Sniper, _, true);
 		TF2Attrib_SetByName(this.index, "max health additive bonus", 25.0);
-		SetEntityHealth(this.index, 200); // Just in case
+		SetEntityHealth(this.index, GetEntProp(this.index, Prop_Data, "m_iMaxHealth")); // Just in case
 
 		this.RemoveAllItems(true);
 
@@ -376,7 +376,7 @@ methodmap CWizard < BTCBaseClass
 		GetClientAbsOrigin(this.index, victimpos);
 		char killSound[35];
 		Format(killSound, sizeof(killSound), "vo/halloween_merasmus/sf12_combat_idle0%i.mp3", GetRandomInt(1, 2));
-		EmitSoundToAll(killSound, this.index, _, _, _, 0.5, _, _, victimpos, _, false);
+		EmitSoundToAll(killSound, attacker.index, _, _, _, 0.5, _, _, victimpos, _, false);
 
 		this.UpdateHUD(g_btc_wizard.m_hHUDs[SpellHUD], "", 0.0, -1.0, 0.5, 0, 255, 0, 255, 2, 0.0, 0.0, 0.0);
 		this.UpdateHUD(g_btc_wizard.m_hHUDs[CoolHUD], "", 0.0, -1.0, 0.5, 0, 255, 0, 255, 2, 0.0, 0.0, 0.0);
@@ -591,37 +591,44 @@ methodmap CWizard < BTCBaseClass
 
 		if((GetClientButtons(this.index) & IN_ATTACK2) && this.IsReady() && !TF2_IsPlayerInCondition(this.index, view_as<TFCond>(50)) && this.fCooldown <= 0.0) { // Cast mechanic
 			if(this.iSpelltype == 0 && this.iFireCharges > 0 && this.fMana >= g_btc_wizard.m_hCvars[WizardFireCost].FloatValue) { // Fire spell
-				this.fFireCooldown = g_btc_wizard.m_hCvars[WizardFireCooldown].FloatValue;
+				if(this.iFireCharges == g_btc_wizard.m_hCvars[WizardFireCharges].IntValue)
+					this.fFireCooldown = g_btc_wizard.m_hCvars[WizardFireCooldown].FloatValue;
 				this.iFireCharges--;
 				this.fMana -= g_btc_wizard.m_hCvars[WizardFireCost].FloatValue;
 			}
 			else if(this.iSpelltype == 1 && this.iBatsCharges > 0 && this.fMana >= g_btc_wizard.m_hCvars[WizardBatsCost].FloatValue) { // Bats
-				this.fBatsCooldown = g_btc_wizard.m_hCvars[WizardBatsCooldown].FloatValue;
+				if(this.iBatsCharges == g_btc_wizard.m_hCvars[WizardBatsCharges].IntValue)
+					this.fBatsCooldown = g_btc_wizard.m_hCvars[WizardBatsCooldown].FloatValue;
 				this.iBatsCharges--;
 				this.fMana -= g_btc_wizard.m_hCvars[WizardBatsCost].FloatValue;
 			}
 			else if(this.iSpelltype == 2 && this.iUberCharges > 0 && this.fMana >= g_btc_wizard.m_hCvars[WizardUberCost].FloatValue) { // Uber
-				this.fUberCooldown = g_btc_wizard.m_hCvars[WizardUberCooldown].FloatValue;
+				if(this.iUberCharges == g_btc_wizard.m_hCvars[WizardUberCharges].IntValue)
+					this.fUberCooldown = g_btc_wizard.m_hCvars[WizardUberCooldown].FloatValue;
 				this.iUberCharges--;
 				this.fMana -= g_btc_wizard.m_hCvars[WizardUberCost].FloatValue;
 			}
 			else if(this.iSpelltype == 4 && this.iJumpCharges > 0 && this.fMana >= g_btc_wizard.m_hCvars[WizardJumpCost].FloatValue) { // Jump spell
-				this.fJumpCooldown = g_btc_wizard.m_hCvars[WizardJumpCooldown].FloatValue;
+				if(this.iJumpCharges == g_btc_wizard.m_hCvars[WizardJumpCharges].IntValue)
+					this.fJumpCooldown = g_btc_wizard.m_hCvars[WizardJumpCooldown].FloatValue;
 				this.iJumpCharges--;
 				this.fMana -= g_btc_wizard.m_hCvars[WizardJumpCost].FloatValue;
 			}
 			else if(this.iSpelltype == 5 && this.iInvisCharges > 0 && this.fMana >= g_btc_wizard.m_hCvars[WizardInvisCost].FloatValue) { // Invis
-				this.fInvisCooldown = g_btc_wizard.m_hCvars[WizardInvisCooldown].FloatValue;
+				if(this.iInvisCharges == g_btc_wizard.m_hCvars[WizardInvisCharges].IntValue)
+					this.fInvisCooldown = g_btc_wizard.m_hCvars[WizardInvisCooldown].FloatValue;
 				this.iInvisCharges--;
 				this.fMana -= g_btc_wizard.m_hCvars[WizardInvisCost].FloatValue;
 			}
 			else if(this.iSpelltype == 9 && this.iMeteorCharges > 0 && this.fMana >= g_btc_wizard.m_hCvars[WizardMeteorCost].FloatValue) { // Meteor Spell
-				this.fMeteorCooldown = g_btc_wizard.m_hCvars[WizardMeteorCooldown].FloatValue;
+				if(this.iMeteorCharges == g_btc_wizard.m_hCvars[WizardMeteorCharges].IntValue)
+					this.fMeteorCooldown = g_btc_wizard.m_hCvars[WizardMeteorCooldown].FloatValue;
 				this.iMeteorCharges--;
 				this.fMana -= g_btc_wizard.m_hCvars[WizardMeteorCost].FloatValue;
 			}
 			else if(this.iSpelltype == 10 && this.iMonoCharges > 0 && this.fMana >= g_btc_wizard.m_hCvars[WizardMonoCost].FloatValue) { // Monoculus
-				this.fMonoCooldown = g_btc_wizard.m_hCvars[WizardMonoCooldown].FloatValue;
+				if(this.iMonoCharges == g_btc_wizard.m_hCvars[WizardMonoCharges].IntValue)
+					this.fMonoCooldown = g_btc_wizard.m_hCvars[WizardMonoCooldown].FloatValue;
 				this.iMonoCharges--;
 				this.fMana -= g_btc_wizard.m_hCvars[WizardMonoCost].FloatValue;
 			}
@@ -713,6 +720,36 @@ public void OnRoundStart(Event event, const char[] name, bool dontBroadcast) {
 
 public void Wizard_OnCallDownloads() {
 	PrecacheModel(Wizard_Model, true);
+
+	char medSound[35];
+	for(int i = 4; i; i--) {
+		Format(medSound, sizeof(medSound), "vo/merasmus/round_begin0%i.mp3", i);
+		PrecacheSound(medSound, true);
+	}
+	for(int i = 3; i; i--) {
+		Format(medSound, sizeof(medSound), "vo/merasmus/stunned0%i.mp3", i);
+		PrecacheSound(medSound, true);
+	}
+	for(int i = 2; i; i--) {
+		Format(medSound, sizeof(medSound), "vo/halloween_merasmus/sf12_combat_idle0%i.mp3", i);
+		PrecacheSound(medSound, true);
+	}
+	for(int i = 6; i; i--) {
+		Format(medSound, sizeof(medSound), "vo/merasmus/sf12_pain0%i.mp3", i);
+		PrecacheSound(medSound, true);
+	}
+	for(int i = 4; i; i--) {
+		Format(medSound, sizeof(medSound), "vo/merasmus/spell_cast_fire%i.mp3", i);
+		PrecacheSound(medSound, true)
+	}
+	for(int i = 7; i; i--) {
+		Format(medSound, sizeof(medSound), "vo/merasmus/spell_cast%i.mp3", i);
+		PrecacheSound(medSound, true);
+	}
+	for(int i = 2; i; i--) {
+		Format(medSound, sizeof(medSound), "vo/merasmus/spell_cast_rare%i.mp3", i);
+		PrecacheSound(medSound, true);
+	}
 }
 
 public void Wizard_OnClassMenu(Menu &menu) {

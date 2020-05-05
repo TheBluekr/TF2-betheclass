@@ -148,8 +148,6 @@ methodmap BaseClass
 }
 
 public void OnPluginStart() {
-	RegConsoleCmd("sm_class", CommandCreateClassMenu, "Usage: sm_class");
-	
 	HookEvent("player_spawn", OnSpawn);
 	HookEvent("player_death", OnPlayerDeath, EventHookMode_Pre);
 	HookEvent("player_hurt", OnPlayerHurt, EventHookMode_Pre);
@@ -284,45 +282,6 @@ public Action Timer_PlayerThink(Handle hTimer) {
 	}
 	
 	return Plugin_Continue;
-}
-
-/// Menu handling
-public Action CommandCreateClassMenu(int iClient, int args) {
-	if(IsValidClient(iClient))
-	{
-		CreateClassMenu(iClient); // Just pass the client
-	}
-	return Plugin_Handled;
-}
-
-public void CreateClassMenu(int iClient) {
-	Menu classMenu = new Menu(MenuHandler_PickClass);
-	classMenu.SetTitle("Class selection menu: ");
-	// More flexible menu selection values
-	// ToDo, make this easier to work with
-	char buffer[16];
-	IntToString(0, buffer, sizeof(buffer));
-	classMenu.AddItem(buffer, "None");
-	classMenu.ExitButton = true;
-
-	Call_StartForward(g_btc.m_hForwards[OnClassMenu]);
-	Call_PushCellRef(classMenu);
-	Call_Finish();
-
-	classMenu.Display(iClient, 30);
-}
-
-public int MenuHandler_PickClass(Menu menu, MenuAction action, int param1, int param2) {
-	if(action == MenuAction_Select) {
-		BaseClass player = BaseClass(param1); /// Param1 is always the client in this case
-		char selection[16];
-		menu.GetItem(param2, selection, sizeof(selection));
-		player.iPresetType = StringToInt(selection);
-		PrintToChat(player.index, "\x01\x070066BB[BeTheClass]\x01 Selection set.");
-	}
-	else if(action == MenuAction_End) {
-		delete menu;
-	}
 }
 
 public Action OnJoinClass(int client, const char[] command, int argc)

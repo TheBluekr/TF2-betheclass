@@ -150,11 +150,13 @@ methodmap BaseClass
 }
 
 public void OnPluginStart() {
-	RegConsoleCmd("sm_class", CommandCreateClassMenu, "Usage: sm_class");
-	
 	HookEvent("player_spawn", OnSpawn);
 	HookEvent("player_death", OnPlayerDeath, EventHookMode_Pre);
 	HookEvent("player_hurt", OnPlayerHurt, EventHookMode_Pre);
+	HookEvent("post_inventory_application", OnResupply, EventHookMode_Pre);
+
+	AddCommandListener(OnJoinClass, "joinclass");
+	AddCommandListener(OnJoinClass, "join_class");
 
 	g_btc.m_hForwards[OnCallDownload] = new PrivateForward(ET_Event);
 	g_btc.m_hForwards[OnClassThink] = new PrivateForward(ET_Event, Param_Cell);
@@ -173,6 +175,8 @@ public Action OnSpawn(Event event, const char[] name, bool dontBroadcast) {
 	if( player && IsClientInGame(player.index) ) {
 		SetVariantString(""); AcceptEntityInput(player.index, "SetCustomModel");
 		player.SetOverlay("0");
+
+		SetEntProp(player.index, Prop_Send, "m_iDesiredPlayerClass", 10);
 		
 		Action act;
 		Call_StartForward(g_btc.m_hForwards[OnClassSpawn]);
@@ -182,6 +186,8 @@ public Action OnSpawn(Event event, const char[] name, bool dontBroadcast) {
 
 		if(act > Plugin_Changed)
 			return Plugin_Continue;
+
+		SetEntProp(player.index, Prop_Send, "m_iDesiredPlayerClass", event.GetInt("class"));
 
 		TF2Attrib_RemoveAll(player.index);
 		TF2_RegeneratePlayer(player.index);
@@ -208,10 +214,10 @@ public Action OnPlayerDeath(Event event, const char[] name, bool dontBroadcast) 
 }
 
 public Action OnPlayerHurt(Event event, const char[] name, bool dontBroadcast) {
-	BaseClass victim = BaseClass( event.GetInt("userid"), true );
+	BaseClass victim = BaseClass(event.GetInt("userid"), true);
 	
 	/// make sure the attacker is valid so we can set him/her as BaseClass instance
-	int attacker = GetClientOfUserId( event.GetInt("attacker") );
+	int attacker = GetClientOfUserId(event.GetInt("attacker"));
 	if( victim.index == attacker || attacker <= 0 )
 		return Plugin_Continue;
 	
@@ -229,16 +235,32 @@ public Action OnPlayerHurt(Event event, const char[] name, bool dontBroadcast) {
 	return Plugin_Continue;
 }
 
+public Action OnResupply(Event event, const char[] name, bool dontBroadcast) {
+	BaseClass player = BaseClass(event.GetInt("userid"), true);
+	if(!IsValidClient(player.index, true))
+		return Plugin_Continue;
+	
+	Action act;
+	Call_StartForward(g_btc.m_hForwards[OnClassResupply]);
+	Call_PushCell(player);
+	Call_PushCell(event);
+	Call_Finish(act);
+	if(act > Plugin_Continue) {
+		return act;
+	}
+	return Plugin_Continue;
+}
+
 public void OnClientPutInServer(int client) {
 	g_btc.m_hPlayerFields[client] = new StringMap();
 	g_btc.m_hPlayerFields[client].SetValue("iPresetType", 0);
+	g_btc.m_hPlayerFields[client].SetValue("iClassType", 0);
 }
 
 public void OnClientDisconnect(int client) {
 	//BaseClass baseplayer = BaseClass(client);
 	g_btc.m_hPlayerFields[client].SetValue("iPresetType", 0);
 	g_btc.m_hPlayerFields[client].SetValue("iClassType", 0);
-	/// Just to prevent limit from glitching out
 }
 
 public void OnMapStart() {
@@ -264,43 +286,14 @@ public Action Timer_PlayerThink(Handle hTimer) {
 	return Plugin_Continue;
 }
 
-/// Menu handling
-public Action CommandCreateClassMenu(int iClient, int args) {
-	if(IsValidClient(iClient))
-	{
-		CreateClassMenu(iClient); // Just pass the client
+public Action OnJoinClass(int client, const char[] command, int argc)
+{
+	BaseClass player = BaseClass(client);
+	if(player.iPresetType > 0) {
+		player.iPresetType = 0;
+		PrintToChat(player.index, "\x01\x070066BB[BeTheClass]\x01 Reset selection due to class change.");
 	}
-	return Plugin_Handled;
-}
-
-public void CreateClassMenu(int iClient) {
-	Menu classMenu = new Menu(MenuHandler_PickClass);
-	classMenu.SetTitle("Class selection menu: ");
-	// More flexible menu selection values
-	// ToDo, make this easier to work with
-	char buffer[16];
-	IntToString(0, buffer, sizeof(buffer));
-	classMenu.AddItem(buffer, "None");
-	classMenu.ExitButton = true;
-
-	Call_StartForward(g_btc.m_hForwards[OnClassMenu]);
-	Call_PushCellRef(classMenu);
-	Call_Finish();
-
-	classMenu.Display(iClient, 30);
-}
-
-public int MenuHandler_PickClass(Menu menu, MenuAction action, int param1, int param2) {
-	if(action == MenuAction_Select) {
-		BaseClass baseplayer = BaseClass(param1); /// Param1 is always the client in this case
-		char selection[16];
-		menu.GetItem(param2, selection, sizeof(selection));
-		baseplayer.iPresetType = StringToInt(selection);
-		PrintToChat(baseplayer.index, "\x01\x070066BB[BeTheClass]\x01 Selection set.");
-	}
-	else if(action == MenuAction_End) {
-		delete menu;
-	}
+	return Plugin_Continue;
 }
 
 /// Shamelessly using this from VSH2, nice code Assyrianic
@@ -326,7 +319,7 @@ public int RegisterClass(Handle plugin, const char modulename[MAX_CLASS_NAME_SIZ
 			/// override its plugin ID then, it was probably reloaded.
 			module.plugin = plugin;
 			g_btc.m_hClassesRegistered.SetArray(i, module, sizeof(module));
-			return i + 1;
+			return i;
 		}
 	}
 	
@@ -335,11 +328,13 @@ public int RegisterClass(Handle plugin, const char modulename[MAX_CLASS_NAME_SIZ
 	module.name = modulename;
 	module.plugin = plugin;
 	g_btc.m_hClassesRegistered.PushArray(module, sizeof(module));
-	return g_btc.m_hClassesRegistered.Length + 1;
+	return g_btc.m_hClassesRegistered.Length;
 }
 
 public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max) {
 	CreateNative("BTC_RegisterPlugin", Native_RegisterClass);
+
+	CreateNative("BTC_ClassMenu", Native_ClassMenu);
 
 	CreateNative("BTC_Hook", Native_Hook);
 	CreateNative("BTC_HookEx", Native_HookEx);
@@ -370,6 +365,13 @@ public int Native_RegisterClass(Handle plugin, int numParams) {
 	char module_name[MAX_CLASS_NAME_SIZE]; GetNativeString(1, module_name, sizeof(module_name));
 	/// ALL PROPS TO COOKIES.NET AKA COOKIES.IO
 	return RegisterClass(plugin, module_name);
+}
+
+public int Native_ClassMenu(Handle plugin, int numParams) {
+	Menu menu = GetNativeCell(1);
+	Call_StartForward(g_btc.m_hForwards[OnClassMenu]);
+	Call_PushCellRef(menu);
+	Call_Finish();
 }
 
 public any Native_BTC_Instance(Handle plugin, int numParams) {
