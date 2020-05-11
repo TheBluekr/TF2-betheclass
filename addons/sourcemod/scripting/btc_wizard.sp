@@ -318,6 +318,16 @@ methodmap CWizard < BTCBaseClass
 			this.SetPropFloat("fInvisBonus", val);
 		}
 	}
+	property float fJamTime {
+		public get()
+		{
+			return this.GetPropFloat("fJamTime");
+		}
+		public set(const float val)
+		{
+			this.SetPropFloat("fJamTime", val);
+		}
+	}
 	public void UpdateHUD(Handle hHUD, const char[] text, float x, float y, float holdTime, int r, int g, int b, int a, int effect, float fxTime, float fadeIn, float fadeOut) {
 		SetHudTextParams(x, y, holdTime, r, g, b, a, effect, fxTime, fadeIn, fadeOut);
 		ShowSyncHudText(this.index, hHUD, text);
@@ -359,6 +369,7 @@ methodmap CWizard < BTCBaseClass
 		this.iCastSound = 0;
 		this.iSpelltype = 0;
 		this.fInvisBonus = 0.0;
+		this.fJamTime = 0.0;
 
 		SetVariantString(Wizard_Model);
 		AcceptEntityInput(this.index, "SetCustomModel");
@@ -419,7 +430,7 @@ methodmap CWizard < BTCBaseClass
 		if(!IsValidClient(this.index, true))
 			return;
 		
-		if(TF2_IsPlayerInCondition(this.index, view_as<TFCond>(50)))
+		if(TF2_IsPlayerInCondition(this.index, view_as<TFCond>(50) || this.fJamTime > 0.0))
 			this.UpdateHUD(g_btc_wizard.m_hHUDs[StatusHUD], "Your magic is being jammed! Run Away!", -1.0, 0.75, 0.5, 255, 255, 255, 255, 2, 0.0, 0.0, 0.0);
 		else
 			this.UpdateHUD(g_btc_wizard.m_hHUDs[StatusHUD], "", -1.0, 0.75, 0.5, 255, 255, 255, 255, 2, 0.0, 0.0, 0.0);
@@ -452,6 +463,13 @@ methodmap CWizard < BTCBaseClass
 		this.fMonoCooldown -= 0.1;
 		if(this.fMonoCooldown < 0.0)
 			this.fMonoCooldown = 0.0;
+		
+		this.fInvisCooldown -= 0.1;
+		if(this.fInvisCooldown < 0.0)
+			this.fInvisCooldown = 0.0;
+		this.fJamTime -= 0.1;
+		if(this.fJamTime < 0.0)
+			this.fJamTime = 0.0;
 
 		Format(CoolHUDText, sizeof(CoolHUDText), "              (%i) %i\n              (%i) %i\n              (%i) %i\n              (%i) %i\n              (%i) %i\n              (%i) %i\n              (%i) %i\n", this.iFireCharges, RoundToCeil(this.fFireCooldown), this.iBatsCharges, RoundToCeil(this.fBatsCooldown), this.iUberCharges, RoundToCeil(this.fUberCooldown), this.iJumpCharges, RoundToCeil(this.fJumpCooldown), this.iInvisCharges, RoundToCeil(this.fInvisCooldown), this.iMeteorCharges, RoundToCeil(this.fMeteorCooldown), this.iMonoCharges, RoundToCeil(this.fMonoCooldown));
 		switch(this.iSelectedSpell) {
@@ -589,7 +607,7 @@ methodmap CWizard < BTCBaseClass
 
 		SetEntProp(iSpellbook, Prop_Send, "m_iSelectedSpellIndex", this.iSpelltype); // No need to call it 7 times if we can just set it here
 
-		if((GetClientButtons(this.index) & IN_ATTACK2) && this.IsReady() && !TF2_IsPlayerInCondition(this.index, view_as<TFCond>(50)) && this.fCooldown <= 0.0) { // Cast mechanic
+		if((GetClientButtons(this.index) & IN_ATTACK2) && this.IsReady() && this.fCooldown <= 0.0 && (!TF2_IsPlayerInCondition(this.index, view_as<TFCond>(50)) || this.fJamTime <= 0.0)) { // Cast mechanic
 			if(this.iSpelltype == 0 && this.iFireCharges > 0 && this.fMana >= g_btc_wizard.m_hCvars[WizardFireCost].FloatValue) { // Fire spell
 				if(this.iFireCharges == g_btc_wizard.m_hCvars[WizardFireCharges].IntValue)
 					this.fFireCooldown = g_btc_wizard.m_hCvars[WizardFireCooldown].FloatValue;

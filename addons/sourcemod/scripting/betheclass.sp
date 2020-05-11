@@ -170,6 +170,7 @@ public void OnPluginStart() {
 
 public Action OnSpawn(Event event, const char[] name, bool dontBroadcast) {
 	BaseClass player = BaseClass(event.GetInt("userid"), true);
+	player.iClassType = 0;
 	if( player && IsClientInGame(player.index) ) {
 		SetVariantString(""); AcceptEntityInput(player.index, "SetCustomModel");
 		player.SetOverlay("0");

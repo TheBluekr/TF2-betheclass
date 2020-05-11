@@ -21,19 +21,22 @@ public Plugin myinfo =
 public void OnPluginStart() {
 	RegConsoleCmd("sm_merc", CommandMerc, "Usage: sm_merc");
 	RegConsoleCmd("sm_wizard", CommandWizard, "Usage: sm_wizard");
+
+	HookEvent("teamplay_round_win", RoundEnd);
 }
 
 public Action CommandMerc(int iClient, int args) {
 	char arg1[32];
 	GetCmdArg(1, arg1, sizeof(arg1));
-	int target = FindTarget(client, arg1);
+	int target = FindTarget(iClient, arg1);
 	if(target == -1)
 		return Plugin_Handled;
 	StringMap map = BTC_GetClassIDs();
 	int mercID;
-	if(!map.GetValue("mercenary", mercID)) /// First limitation of command, can't respond with error codes to another plugin invoking said command as with natives
+	if(!map.GetValue("mercenary", mercID)) { /// First limitation of command, can't respond with error codes to another plugin invoking said command as with natives
 		delete map;
 		return Plugin_Handled;
+	}
 	delete map;
 	BTCBaseClass player = BTCBaseClass(iClient);
 	SetClassPreset(player, mercID);
@@ -43,14 +46,15 @@ public Action CommandMerc(int iClient, int args) {
 public Action CommandWizard(int iClient, int args) {
 	char arg1[32];
 	GetCmdArg(1, arg1, sizeof(arg1));
-	int target = FindTarget(client, arg1);
+	int target = FindTarget(iClient, arg1);
 	if(target == -1)
 		return Plugin_Handled;
 	StringMap map = BTC_GetClassIDs();
 	int wizardID;
-	if(!map.GetValue("wizard", wizardID)) /// First limitation of command, can't respond with error codes to another plugin invoking said command as with natives
+	if(!map.GetValue("wizard", wizardID)) { /// First limitation of command, can't respond with error codes to another plugin invoking said command as with natives
 		delete map;
 		return Plugin_Handled;
+	}
 	delete map;
 	BTCBaseClass player = BTCBaseClass(iClient);
 	SetClassPreset(player, wizardID);
@@ -60,7 +64,14 @@ public Action CommandWizard(int iClient, int args) {
 public void SetClassPreset(BTCBaseClass player, int index) {
 	player.SetPropInt("iPresetType", index);
 	TF2_RespawnPlayer(player.index);
-	SetPawnTimer(ResetClassPreset, 0.2, player);
+	/// Commenting this out, it causes issues with Redheart else
+	//SetPawnTimer(ResetClassPreset, 0.2, player);
+}
+
+public Action RoundEnd(Event event, const char[] name, bool dontBroadcast) {
+	for(int i=MaxClients; i; i--) {
+		ResetClassPreset(BTCBaseClass(i));		
+	}
 }
 
 public void ResetClassPreset(BTCBaseClass player) {

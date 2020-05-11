@@ -11,12 +11,14 @@
 
 public Plugin myinfo =
 {
-	name = "Be The Class Hub core (FF2 edition)",
+	name = "Be The Class Hub core",
 	author = "TheBluekr",
 	description = "Set the player's class to any of the custom classes!",
 	version = PLUGIN_VERSION,
 	url = "https://git.thebluekr.nl/vspr/be-the-class"
 };
+
+Handle StartTimer;
 
 enum {
 	ClassPreset,
@@ -59,33 +61,33 @@ methodmap BaseClass
 	property int iPresetType {
 		public get()
 		{
-			if(!this.index)
-				return -1;
 			int i; g_btc.m_hPlayerFields[this.index].GetValue("iPresetType", i);
 			return i;
 		}
 		public set(const int val)
 		{
-			int player = this.index;
-			if( !player )
-				return;
-			g_btc.m_hPlayerFields[player].SetValue("iPresetType", val);
+			g_btc.m_hPlayerFields[this.index].SetValue("iPresetType", val);
 		}
 	}
 	property int iClassType {
 		public get()
 		{
-			if(!this.index)
-				return -1;
 			int i; g_btc.m_hPlayerFields[this.index].GetValue("iClassType", i);
 			return i;
 		}
 		public set(const int val)
 		{
-			int player = this.index;
-			if( !player )
-				return;
-			g_btc.m_hPlayerFields[player].SetValue("iClassType", val);
+			g_btc.m_hPlayerFields[this.index].SetValue("iClassType", val);
+		}
+	}
+	property bool bPreventSpawn {
+		public get()
+		{
+			bool b; g_btc.m_hPlayerFields[this.index].GetValue("bPreventSpawn", b);
+			return b;
+		}
+		public set(const bool val) {
+			g_btc.m_hPlayerFields[this.index].SetValue("bPreventSpawn", b);
 		}
 	}
 
@@ -154,6 +156,8 @@ public void OnPluginStart() {
 	HookEvent("player_death", OnPlayerDeath, EventHookMode_Pre);
 	HookEvent("player_hurt", OnPlayerHurt, EventHookMode_Pre);
 	HookEvent("post_inventory_application", OnResupply, EventHookMode_Pre);
+	HookEvent("teamplay_round_start", RoundStart);
+	HookEvent("teamplay_round_win", RoundEnd);
 
 	AddCommandListener(OnJoinClass, "joinclass");
 	AddCommandListener(OnJoinClass, "join_class");
@@ -170,9 +174,25 @@ public void OnPluginStart() {
 	g_btc.m_hClassesRegistered = new ArrayList(sizeof(ClassModule));
 }
 
+public Action FF2_OnAbility2(int boss, const char[] plugin_name, const char[] ability_name, int status) {
+	if(!strcmp("ff2_sarysamods3", plugin_name) && !strcmp("rage_meter_scramble", ability_name)) {
+		/// Classes will respawn, don't handle it
+		return;
+	}
+	if(!AllowCustomMinionSpawn(boss)) {
+		/// Not the cleanest method, but FF2 isn't clean either...
+		BaseClass player;
+		for(int i=MaxClients; i; i--) {
+			g_btc.m_hPlayerFields[i].SetValue("fJamTime", 5.0);
+		}
+	}
+	return Plugin_Continue;
+}
+
 public Action OnSpawn(Event event, const char[] name, bool dontBroadcast) {
 	BaseClass player = BaseClass(event.GetInt("userid"), true);
-	if( player && IsClientInGame(player.index) ) {
+	player.iClassType = 0;
+	if(player && IsClientInGame(player.index) && !FF2_GetBossIndex(player.index) && !player.bPreventSpawn) {
 		SetVariantString(""); AcceptEntityInput(player.index, "SetCustomModel");
 		player.SetOverlay("0");
 
@@ -199,6 +219,15 @@ public Action OnSpawn(Event event, const char[] name, bool dontBroadcast) {
 public Action OnPlayerDeath(Event event, const char[] name, bool dontBroadcast) {
 	BaseClass victim = BaseClass( event.GetInt("userid"), true );
 	BaseClass fighter = BaseClass( event.GetInt("attacker"), true );
+
+	/**
+	 * Preventive bug-patch:
+	 * Since Cozy has both a respawn and conversion mechanic and both don't invoke "OnAbility" presumably
+	 * We've gotta prepare to not allow respawn "heroes" to be both custom classes and mini-bosses
+	**/
+	if(FF2_HasAbility(fighter, "ff2_mane6", "event_mane6") {
+		victim.bPreventSpawn = true;
+	}
 
 	Action act;
 	Call_StartForward(g_btc.m_hForwards[OnClassDeath]);
@@ -255,12 +284,14 @@ public void OnClientPutInServer(int client) {
 	g_btc.m_hPlayerFields[client] = new StringMap();
 	g_btc.m_hPlayerFields[client].SetValue("iPresetType", 0);
 	g_btc.m_hPlayerFields[client].SetValue("iClassType", 0);
+	g_btc.m_hPlayerFields[client].SetValue("bPreventSpawn", false);
 }
 
 public void OnClientDisconnect(int client) {
 	//BaseClass baseplayer = BaseClass(client);
 	g_btc.m_hPlayerFields[client].SetValue("iPresetType", 0);
 	g_btc.m_hPlayerFields[client].SetValue("iClassType", 0);
+	g_btc.m_hPlayerFields[client].SetValue("bPreventSpawn", false);
 }
 
 public void OnMapStart() {
@@ -270,13 +301,34 @@ public void OnMapStart() {
 	CreateTimer(0.1, Timer_PlayerThink, _, TIMER_REPEAT|TIMER_FLAG_NO_MAPCHANGE);
 }
 
+public Action RoundStart(Event event, const char[] name, bool dontBroadcast) {
+	SetPawnTimer(DisableLateSpawn, 3.5);
+}
+
+public Action RoundEnd(Event event, const char[] name, bool dontBroadcast) {
+	BaseClass player;
+	for(int i=MaxClients; i; i--) {
+		if(!IsValidClient(i, false))
+			continue;
+
+		player = BaseClass(i);
+		player.bPreventSpawn = false;
+	}
+}
+
 public Action Timer_PlayerThink(Handle hTimer) {
 	BaseClass player;
-	for(int i=MaxClients; i; --i) {
+	for(int i=MaxClients; i; i--) {
 		if(!IsValidClient(i, false))
 			continue;
 		
 		player = BaseClass(i);
+
+		// Guess player got converted to boss, make sure to correct the type for handling
+		if(FF2_GetBossIndex(player.index) && player.iClassType > 0) {
+			player.iClassType = 0;
+			continue;
+		}
 
 		Call_StartForward(g_btc.m_hForwards[OnClassThink]);
 		Call_PushCell(player);
@@ -286,14 +338,33 @@ public Action Timer_PlayerThink(Handle hTimer) {
 	return Plugin_Continue;
 }
 
-public Action OnJoinClass(int client, const char[] command, int argc)
-{
+public Action OnJoinClass(int client, const char[] command, int argc) {
 	BaseClass player = BaseClass(client);
 	if(player.iPresetType > 0) {
 		player.iPresetType = 0;
 		PrintToChat(player.index, "\x01\x070066BB[BeTheClass]\x01 Reset selection due to class change.");
 	}
 	return Plugin_Continue;
+}
+
+public void DisableLateSpawn() {
+	BaseClass player;
+	for(int i=MaxClients; i; i--) {
+		player = BaseClass(i);
+		player.bPreventSpawn = true;
+	}
+	/// Begin looking now for bosses which might spawn custom class minions
+	for(int i=0; i<MaxClients; i--) {
+		int client = GetClientOfUserId(FF2_GetBossUserId(i));
+		if(client == -1)
+			break;
+		if(AllowCustomMinionSpawn(client)) {
+			for(int j=MaxClients; j; j--) {
+				player = BaseClass(j);
+				player.bPreventSpawn = false;
+			}
+		}
+	}
 }
 
 /// Shamelessly using this from VSH2, nice code Assyrianic
@@ -335,6 +406,7 @@ public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max
 	CreateNative("BTC_RegisterPlugin", Native_RegisterClass);
 
 	CreateNative("BTC_ClassMenu", Native_ClassMenu);
+	CreateNative("BTC_GetClassIDs", Native_GetClassIDs);
 
 	CreateNative("BTC_Hook", Native_Hook);
 	CreateNative("BTC_HookEx", Native_HookEx);
@@ -372,6 +444,18 @@ public int Native_ClassMenu(Handle plugin, int numParams) {
 	Call_StartForward(g_btc.m_hForwards[OnClassMenu]);
 	Call_PushCellRef(menu);
 	Call_Finish();
+}
+
+public any Native_GetClassIDs(Handle plugin, int numParams) {
+	StringMap class_map = new StringMap();
+	for(int i; i < g_btc.m_hClassesRegistered.Length; i++) {
+		ClassModule class_plugin;
+		g_btc.m_hClassesRegistered.GetArray(i, class_plugin, sizeof(class_plugin));
+		class_map.SetValue(class_plugin.name, i);
+	}
+	if(!class_map.Size)
+		delete class_map;
+	return class_map;
 }
 
 public any Native_BTC_Instance(Handle plugin, int numParams) {
@@ -497,11 +581,9 @@ stock int GetOwner(const int ent) {
 	return( IsValidEntity(ent) ) ? GetEntPropEnt(ent, Prop_Send, "m_hOwnerEntity") : -1;
 }
 
-stock void SetPawnTimer(Function func, float thinktime = 0.1, any param1 = -999, any param2 = -999)
-{
-	DataPack thinkpack = new DataPack();
-	thinkpack.WriteFunction(func);
-	thinkpack.WriteCell(param1);
-	thinkpack.WriteCell(param2);
-	CreateTimer(thinktime, DoThink, thinkpack, TIMER_DATA_HNDL_CLOSE);
+// Special function for FF2 to define whether a boss can spawn custom class minions
+stock bool AllowCustomMinionSpawn(int boss) {
+	if(FF2_HasAbility(boss, "special_redheart", "revive_markers") || FF2_HasAbility(boss, "ff2_otokiru", "rage_gentlemen") || FF2_HasAbility(boss, "ff2_cozy", "rage_control"))
+		return true;
+	return false;
 }
