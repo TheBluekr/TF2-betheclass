@@ -117,7 +117,7 @@ native bool BTC_UnhookEx(const int callbacktype, BTCHookCB callback);
 public SharedPlugin __pl_betheclass = 
 {
 	name = "BeTheClass",
-	file = "betheclass.smx",
+	file = "btc_core.smx",
 #if defined REQUIRE_PLUGIN
 	required = 1,
 #else
