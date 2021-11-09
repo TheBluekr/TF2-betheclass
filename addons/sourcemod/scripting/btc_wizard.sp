@@ -66,8 +66,6 @@ enum struct BTCGlobals_Wizard {
 BTCGlobals_Wizard g_btc_wizard;
 
 public void OnPluginStart() {
-	RegConsoleCmd("sm_wizard", CommandWizardDebug, "Usage: sm_wizard");
-
 	g_btc_wizard.m_hCvars[WizardLimit] = CreateConVar("btc_wizard_limit", "2", "Limit for amount of wizards", FCVAR_NOTIFY, true, 0.0, false, 0.0);
 	g_btc_wizard.m_hCvars[WizardMana] = CreateConVar("btc_wizard_mana", "100.0", "Limit for total wizard mana pool", FCVAR_NOTIFY, true, 0.0, false, 0.0);
 	g_btc_wizard.m_hCvars[WizardManaRegen] = CreateConVar("btc_wizard_mana_regen", "1.0", "Mana regen rate per second", FCVAR_NOTIFY, true, 0.0, false, 0.0);
@@ -838,11 +836,6 @@ public Action HookSound(int clients[64], int& numClients, char sound[PLATFORM_MA
 	if(channel==SNDCHAN_VOICE && IsWizard(player))
 		return Plugin_Stop;
 	return Plugin_Continue;
-}
-
-public Action CommandWizardDebug(int iClient, int args) {
-	ReplyToCommand(iClient, "ID: %i", g_iWizardID);
-	return Plugin_Handled;
 }
 
 /// TF2 Events

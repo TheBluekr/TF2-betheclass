@@ -26,13 +26,14 @@ public Plugin myinfo = {
 	author = "TheBluekr",
 	description = "Addon for Be The Class Hub",
 	version = "0.1",
-	url = "https://git.thebluekr.nl/vspr/be-the-class"
+	url = "https://github.com/TheBluekr/TF2-betheclass"
 };
 
 enum /* CvarName */ {
 	MercenaryLimit,
 	MercenaryGrenade,
 	MercenaryGrenadeRegen,
+	MercenaryGrenadeInterval,
 	MaxBTCMercConVars
 };
 
@@ -53,10 +54,10 @@ enum struct BTCGlobals_Mercenary {
 BTCGlobals_Mercenary g_btc_mercenary;
 
 public void OnPluginStart() {
-	RegConsoleCmd("sm_merc", CommandMercDebug, "Usage: sm_merc");
 	g_btc_mercenary.m_hCvars[MercenaryLimit] = CreateConVar("btc_mercenary_limit", "3", "Limit for amount of mercenaries", FCVAR_NOTIFY, true, 0.0, false, 0.0);
 	g_btc_mercenary.m_hCvars[MercenaryGrenade] = CreateConVar("btc_mercenary_grenade", "2", "Grenade stock limit for mercenaries", FCVAR_NOTIFY, true, 0.0, false, 0.0);
 	g_btc_mercenary.m_hCvars[MercenaryGrenadeRegen] = CreateConVar("btc_mercenary_grenade_regen", "60.0", "Regen interval for grenades for mercenaries", FCVAR_NOTIFY, true, 0.0, false, 0.0);
+	g_btc_mercenary.m_hCvars[MercenaryGrenadeInterval] = CreateConVar("btc_mercenary_grenade_interval", "2.5", "Time between the throwing of grenades for mercenaries", FCVAR_NOTIFY, true, 0.0, false, 0.0);
 
 	//for( int i; i<MaxBTCMercHUDs; i++ )
 		//g_btc_mercenary.m_hHUDs[i] = CreateHudSynchronizer();
@@ -69,8 +70,7 @@ public void OnAllPluginsLoaded()
 {
 	// Taking the SDK calls from STT, thanks for linking me this Ivory -Blue
 	Handle hGamedata = LoadGameConfigFile("betheclass");
-	if(hGamedata == INVALID_HANDLE)
-	{
+	if(hGamedata == INVALID_HANDLE) {
 		LogMessage("Failed to load gamedata: betheclass.txt!");
 		return;
 	}
@@ -81,8 +81,7 @@ public void OnAllPluginsLoaded()
 	PrepSDKCall_AddParameter(SDKType_PlainOldData, SDKPass_Plain);
 	PrepSDKCall_SetReturnInfo(SDKType_PlainOldData, SDKPass_Plain);
 	g_hSDKGetMaxAmmo = EndPrepSDKCall();
-	if(g_hSDKGetMaxAmmo == INVALID_HANDLE)
-	{
+	if(g_hSDKGetMaxAmmo == INVALID_HANDLE) {
 		LogMessage("Failed to create call: CTFPlayer::GetMaxAmmo!");
 	}
 
@@ -90,10 +89,10 @@ public void OnAllPluginsLoaded()
 	PrepSDKCall_SetFromConf(hGamedata, SDKConf_Signature, "CTFPlayer::PlaySpecificSequence");
 	PrepSDKCall_AddParameter(SDKType_String, SDKPass_Pointer);
 	g_hSDKPlaySpecificSequence = EndPrepSDKCall();
-	if(g_hSDKPlaySpecificSequence == INVALID_HANDLE)
-	{
+	if(g_hSDKPlaySpecificSequence == INVALID_HANDLE) {
 		LogMessage("Failed to create call: CTFPlayer::PlaySpecificSequence!");
 	}
+	CloseHandle(hGamedata);
 }
 
 methodmap CMercenary < BTCBaseClass
@@ -179,8 +178,7 @@ methodmap CMercenary < BTCBaseClass
 	}
 	public void OnItemPickUp(char item[64], Event event)
 	{
-		if(StrEqual(item, "ammopack_small", false))
-		{
+		if(StrEqual(item, "ammopack_small", false)) {
 			/// Fix for receiving 31 ammo instead of 32
 			int ammo = GetAmmo(this.index, TFWeaponSlot_Secondary);
 			int maxAmmo = SDK_GetMaxAmmo(this.index, TFWeaponSlot_Secondary);
@@ -199,7 +197,7 @@ methodmap CMercenary < BTCBaseClass
 
 		char sModel[128];
 		GetEntPropString(this.index, Prop_Data, "m_ModelName", sModel, sizeof(sModel)); // Get the complete Modelname.
-		if(StrEqual(sModel, Soldier_Model, false)) { // Bug fix, removing quads turns the player to default soldier model
+		if(StrEqual(sModel, Soldier_Model, false)) { // Bug fix, removing custom models turns the player to default soldier model
 			SetVariantString(Merc_Model);
 			AcceptEntityInput(this.index, "SetCustomModel");
 			SetEntProp(this.index, Prop_Send, "m_bUseClassAnimations", 1);
@@ -225,7 +223,7 @@ methodmap CMercenary < BTCBaseClass
 		if((GetClientButtons(this.index) & IN_ATTACK2) && this.fGrenadeThrowCooldown <= 0.0)
 		{
 			RequestFrame(GrenadeThrow, this);
-			this.fGrenadeThrowCooldown = 2.5;
+			this.fGrenadeThrowCooldown = g_btc_mercenary.m_hCvars[MercenaryGrenadeInterval].FloatValue;
 		}
 		if((GetClientButtons(this.index) & IN_ATTACK3) && IsValidEntity(iGrapplinghook) && iWeapon != iGrapplinghook)
 		{
@@ -263,7 +261,6 @@ public void LoadBTCHooks()
 	if(!BTC_HookEx(OnClassResupply, Mercenary_OnClassResupply))
 		LogError("Error loading OnClassResupply forwards for Mercenary subplugin.");
 }
-
 
 stock bool IsMercenary(const BTCBaseClass player) {
 	return player.GetPropInt("iClassType") == g_iMercID;
@@ -370,9 +367,9 @@ stock void GrenadeThrow(CMercenary merc) {
 	TeleportEntity(iGrenade, pos, NULL_VECTOR, vecs);
 	EmitSoundToClient(merc.index, Prime_Sound, iGrenade, _, _, _, 1.0);
 	SetPawnTimer(GrenadeExplode, 3.8, EntIndexToEntRef(iGrenade));
-	merc.iGrenadeStock--;
-	if(merc.fGrenadeCooldown <= 0.0) /// Assuming we were on the maximum grenades there should be no cooldown (yet)
+	if(merc.fGrenadeCooldown <= 0.0 && merc.iGrenadeStock == g_btc_mercenary.m_hCvars[MercenaryGrenade].IntValue) /// Assuming we were on the maximum grenades there should be no cooldown (yet)
 		merc.fGrenadeCooldown = g_btc_mercenary.m_hCvars[MercenaryGrenadeRegen].FloatValue;
+	merc.iGrenadeStock--;
 }
 
 stock void GrenadeExplode(int iRef)
@@ -598,11 +595,6 @@ public void RemoveParticle(any particle)
 			AcceptEntityInput(particle, "Kill");
 		}
 	}
-}
-
-public Action CommandMercDebug(int iClient, int args) {
-	ReplyToCommand(iClient, "ID: %i", g_iMercID);
-	return Plugin_Handled;
 }
 
 stock void PrecacheParticleSystem(const char[] p_strEffectName)

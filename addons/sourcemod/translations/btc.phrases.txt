@@ -1,0 +1,19 @@
+"Phrases"
+{
+    "Core_Reset_Class_Change"
+    {
+        "en"            "Reset selection due to class change."
+    }
+	"Addon_SetClass_Menu_Title"
+    {
+        "en"            "Class selection menu:"
+    }
+    "Addon_SetClass_Menu_Selection_None"
+    {
+        "en"            "None"
+    }
+    "Addon_SetClass_Menu_Selected"
+    {
+        "en"            "Selection set."
+    }
+}

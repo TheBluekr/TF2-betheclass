@@ -15,7 +15,7 @@ public Plugin myinfo =
 	author = "TheBluekr",
 	description = "Set the player's class to any of the custom classes!",
 	version = PLUGIN_VERSION,
-	url = "https://git.thebluekr.nl/vspr/be-the-class"
+	url = "https://github.com/TheBluekr/TF2-betheclass"
 };
 
 enum {
@@ -170,21 +170,9 @@ public void OnPluginStart() {
 
 	g_btc.m_hPlayerFields[0] = new StringMap();
 	g_btc.m_hClassesRegistered = new ArrayList(sizeof(ClassModule));
-}
 
-public Action FF2_OnAbility2(int boss, const char[] plugin_name, const char[] ability_name, int status) {
-	if(!strcmp("ff2_sarysamods3", plugin_name) && !strcmp("rage_meter_scramble", ability_name)) {
-		/// Classes will respawn, don't handle it
-		return;
-	}
-	if(!AllowCustomMinionSpawn(boss)) {
-		/// Not the cleanest method, but FF2 isn't clean either...
-		BaseClass player;
-		for(int i=MaxClients; i; i--) {
-			g_btc.m_hPlayerFields[i].SetValue("fJamTime", 5.0);
-		}
-	}
-	return Plugin_Continue;
+	LoadTranslations("common.phrases");
+	LoadTranslations("btc.phrases");
 }
 
 public Action OnSpawn(Event event, const char[] name, bool dontBroadcast) {
@@ -193,8 +181,6 @@ public Action OnSpawn(Event event, const char[] name, bool dontBroadcast) {
 	if(player && IsClientInGame(player.index) && !FF2_GetBossIndex(player.index) && !player.bPreventSpawn) {
 		SetVariantString(""); AcceptEntityInput(player.index, "SetCustomModel");
 		player.SetOverlay("0");
-
-		SetEntProp(player.index, Prop_Send, "m_iDesiredPlayerClass", 10);
 		
 		Action act;
 		Call_StartForward(g_btc.m_hForwards[OnClassSpawn]);
@@ -204,8 +190,6 @@ public Action OnSpawn(Event event, const char[] name, bool dontBroadcast) {
 
 		if(act > Plugin_Changed)
 			return Plugin_Continue;
-
-		SetEntProp(player.index, Prop_Send, "m_iDesiredPlayerClass", event.GetInt("class"));
 
 		TF2Attrib_RemoveAll(player.index);
 		TF2_RegeneratePlayer(player.index);
@@ -217,15 +201,6 @@ public Action OnSpawn(Event event, const char[] name, bool dontBroadcast) {
 public Action OnPlayerDeath(Event event, const char[] name, bool dontBroadcast) {
 	BaseClass victim = BaseClass( event.GetInt("userid"), true );
 	BaseClass fighter = BaseClass( event.GetInt("attacker"), true );
-
-	/**
-	 * Preventive bug-patch:
-	 * Since Cozy has both a respawn and conversion mechanic and both don't invoke "OnAbility" presumably
-	 * We've gotta prepare to not allow respawn "heroes" to be both custom classes and mini-bosses
-	**/
-	if(FF2_HasAbility(fighter, "ff2_mane6", "event_mane6") {
-		victim.bPreventSpawn = true;
-	}
 
 	Action act;
 	Call_StartForward(g_btc.m_hForwards[OnClassDeath]);
@@ -242,13 +217,7 @@ public Action OnPlayerDeath(Event event, const char[] name, bool dontBroadcast) 
 
 public Action OnPlayerHurt(Event event, const char[] name, bool dontBroadcast) {
 	BaseClass victim = BaseClass(event.GetInt("userid"), true);
-	
-	/// make sure the attacker is valid so we can set him/her as BaseClass instance
-	int attacker = GetClientOfUserId(event.GetInt("attacker"));
-	if( victim.index == attacker || attacker <= 0 )
-		return Plugin_Continue;
-	
-	BaseClass fighter = BaseClass( event.GetInt("attacker"), true );
+	BaseClass fighter = BaseClass(event.GetInt("attacker"));
 
 	Action act;
 	Call_StartForward(g_btc.m_hForwards[OnClassHurt]);
@@ -279,6 +248,8 @@ public Action OnResupply(Event event, const char[] name, bool dontBroadcast) {
 }
 
 public void OnClientPutInServer(int client) {
+	if(g_btc.m_hPlayerFields[client] != null)
+		delete g_btc.m_hPlayerFields[client];
 	g_btc.m_hPlayerFields[client] = new StringMap();
 	g_btc.m_hPlayerFields[client].SetValue("iPresetType", 0);
 	g_btc.m_hPlayerFields[client].SetValue("iClassType", 0);
@@ -300,7 +271,6 @@ public void OnMapStart() {
 }
 
 public Action RoundStart(Event event, const char[] name, bool dontBroadcast) {
-	SetPawnTimer(DisableLateSpawn, 3.5);
 }
 
 public Action RoundEnd(Event event, const char[] name, bool dontBroadcast) {
@@ -340,29 +310,9 @@ public Action OnJoinClass(int client, const char[] command, int argc) {
 	BaseClass player = BaseClass(client);
 	if(player.iPresetType > 0) {
 		player.iPresetType = 0;
-		PrintToChat(player.index, "\x01\x070066BB[BeTheClass]\x01 Reset selection due to class change.");
+		PrintToChat(player.index, "\x01\x070066BB[BeTheClass]\x01 %T", player.index, "Core_Reset_Class_Change");
 	}
 	return Plugin_Continue;
-}
-
-public void DisableLateSpawn() {
-	BaseClass player;
-	for(int i=MaxClients; i; i--) {
-		player = BaseClass(i);
-		player.bPreventSpawn = true;
-	}
-	/// Begin looking now for bosses which might spawn custom class minions
-	for(int i=0; i<MaxClients; i--) {
-		int client = GetClientOfUserId(FF2_GetBossUserId(i));
-		if(client == -1)
-			break;
-		if(AllowCustomMinionSpawn(client)) {
-			for(int j=MaxClients; j; j--) {
-				player = BaseClass(j);
-				player.bPreventSpawn = false;
-			}
-		}
-	}
 }
 
 /// Shamelessly using this from VSH2, nice code Assyrianic
@@ -577,11 +527,4 @@ stock bool IsValidClient(int clientIdx, bool isPlayerAlive=false) {
 
 stock int GetOwner(const int ent) {
 	return( IsValidEntity(ent) ) ? GetEntPropEnt(ent, Prop_Send, "m_hOwnerEntity") : -1;
-}
-
-// Special function for FF2 to define whether a boss can spawn custom class minions
-stock bool AllowCustomMinionSpawn(int boss) {
-	if(FF2_HasAbility(boss, "special_redheart", "revive_markers") || FF2_HasAbility(boss, "ff2_otokiru", "rage_gentlemen") || FF2_HasAbility(boss, "ff2_cozy", "rage_control"))
-		return true;
-	return false;
 }

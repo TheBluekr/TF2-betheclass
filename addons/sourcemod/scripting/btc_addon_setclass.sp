@@ -9,11 +9,14 @@ public Plugin myinfo =
 	author = "TheBluekr",
 	description = "Set your class to a custom one!",
 	version = PLUGIN_VERSION,
-	url = "https://git.thebluekr.nl/vspr/be-the-class"
+	url = "https://github.com/TheBluekr/TF2-betheclass"
 };
 
 public void OnPluginStart() {
 	RegConsoleCmd("sm_class", CommandCreateClassMenu, "Usage: sm_class");
+
+	LoadTranslations("common.phrases");
+	LoadTranslations("btc.phrases");
 }
 
 /// Menu handling
@@ -27,12 +30,13 @@ public Action CommandCreateClassMenu(int iClient, int args) {
 
 public void CreateClassMenu(int iClient) {
 	Menu classMenu = new Menu(MenuHandler_PickClass);
-	classMenu.SetTitle("Class selection menu: ");
+	classMenu.SetTitle("%T", iClient, "Addon_SetClass_Menu_Title");
 	// More flexible menu selection values
 	// ToDo, make this easier to work with
-	char buffer[16];
+	char buffer[16], lang[32];
 	IntToString(0, buffer, sizeof(buffer));
-	classMenu.AddItem(buffer, "None");
+	Format(lang, sizeof(lang), "%T", iClient, "Addon_SetClass_Menu_Selection_None")
+	classMenu.AddItem(buffer, lang);
 	classMenu.ExitButton = true;
 
 	BTC_ClassMenu(classMenu);
@@ -46,7 +50,7 @@ public int MenuHandler_PickClass(Menu menu, MenuAction action, int param1, int p
 		char selection[16];
 		menu.GetItem(param2, selection, sizeof(selection));
 		player.SetPropInt("iPresetType", StringToInt(selection));
-		PrintToChat(player.index, "\x01\x070066BB[BeTheClass]\x01 Selection set.");
+		PrintToChat(player.index, "\x01\x070066BB[BeTheClass]\x01 %T", player.index, "Addon_SetClass_Menu_Selected");
 	}
 	else if(action == MenuAction_End) {
 		delete menu;
