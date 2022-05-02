@@ -1,0 +1,19 @@
+"Phrases"
+{
+    "Core_Reset_Class_Change"
+    {
+        "ru"            "Повторный выбор в связи с изменением класса."
+    }
+	"Addon_SetClass_Menu_Title"
+    {
+        "ru"            "Меню выбора класса:"
+    }
+    "Addon_SetClass_Menu_Selection_None"
+    {
+        "ru"            "Нет"
+    }
+    "Addon_SetClass_Menu_Selected"
+    {
+        "ru"            "Класс выбран."
+    }
+}
